@@ -1,10 +1,11 @@
 import { create } from 'zustand'
 import {
-  api, getToken,
+  api, ApiError, getToken,
   type CartLineView, type CartReplaceRequest, type Product,
 } from '../api'
 
 const STORAGE_KEY = 'halilov.cart'
+const BROADCAST_CHANNEL = 'halilov.cart'
 // Coalesce rapid +/- clicks into a single PUT to avoid spamming the backend.
 const PUSH_DEBOUNCE_MS = 350
 
@@ -70,11 +71,39 @@ function toCartLine(v: CartLineView): CartLine {
   }
 }
 
+// ---------- cross-tab sync ----------
+
+type CartMessage = { type: 'cart-update'; lines: CartLine[] }
+
+let channel: BroadcastChannel | null = null
+try {
+  // Older Safari versions lack BroadcastChannel; degrade silently.
+  channel = typeof BroadcastChannel !== 'undefined'
+    ? new BroadcastChannel(BROADCAST_CHANNEL)
+    : null
+} catch {
+  channel = null
+}
+
+function broadcastUpdate(lines: CartLine[]) {
+  if (!channel) return
+  try { channel.postMessage({ type: 'cart-update', lines } satisfies CartMessage) } catch { /* ignore */ }
+}
+
+// ---------- debounced push ----------
+
 let pushTimer: number | null = null
+
+function cancelPendingPush() {
+  if (pushTimer !== null) {
+    clearTimeout(pushTimer)
+    pushTimer = null
+  }
+}
 
 function schedulePush(push: () => Promise<void>) {
   if (!getToken()) return
-  if (pushTimer !== null) clearTimeout(pushTimer)
+  cancelPendingPush()
   pushTimer = window.setTimeout(() => {
     pushTimer = null
     push().catch(() => { /* sync failures must not disrupt the UI */ })
@@ -101,6 +130,7 @@ export const useCart = create<CartState>((set, get) => ({
     }
     save(lines)
     set({ lines })
+    broadcastUpdate(lines)
     schedulePush(() => get().pushToRemote())
   },
 
@@ -111,6 +141,7 @@ export const useCart = create<CartState>((set, get) => ({
     )
     save(lines)
     set({ lines })
+    broadcastUpdate(lines)
     schedulePush(() => get().pushToRemote())
   },
 
@@ -118,17 +149,21 @@ export const useCart = create<CartState>((set, get) => ({
     const lines = get().lines.filter(l => l.productId !== productId)
     save(lines)
     set({ lines })
+    broadcastUpdate(lines)
     schedulePush(() => get().pushToRemote())
   },
 
   clearLocal() {
     save([])
     set({ lines: [] })
+    broadcastUpdate([])
   },
 
   async clearAll() {
     save([])
     set({ lines: [] })
+    broadcastUpdate([])
+    cancelPendingPush()
     if (!getToken()) return
     try {
       await api('/api/cart', { method: 'DELETE' })
@@ -144,6 +179,7 @@ export const useCart = create<CartState>((set, get) => ({
       const lines = remote.map(toCartLine)
       save(lines)
       set({ lines })
+      broadcastUpdate(lines)
     } catch {
       // leave local intact on failure
     }
@@ -161,6 +197,7 @@ export const useCart = create<CartState>((set, get) => ({
       const lines = merged.map(toCartLine)
       save(lines)
       set({ lines })
+      broadcastUpdate(lines)
     } catch {
       // ignore — keep local cart as-is
     }
@@ -175,8 +212,17 @@ export const useCart = create<CartState>((set, get) => ({
         method: 'PUT',
         body: JSON.stringify(body),
       })
-    } catch {
-      // ignore — debounced retry happens on next mutation
+    } catch (e) {
+      // 401/403: token died — caller (authStore) handles auth state, keep cart.
+      // 5xx/network: transient, next mutation will retry via debounce.
+      // Other 4xx (400/404/409/422): request is wrong; the optimistic local
+      // state diverged from what the server will accept. Roll back by pulling
+      // the canonical cart and adopting it.
+      if (e instanceof ApiError
+          && e.status >= 400 && e.status < 500
+          && e.status !== 401 && e.status !== 403) {
+        await get().loadFromRemote()
+      }
     }
   },
 
@@ -188,3 +234,15 @@ export const useCart = create<CartState>((set, get) => ({
     return get().lines.reduce((sum, l) => sum + l.priceAgorot * l.quantity, 0)
   },
 }))
+
+// Receive broadcasts from other tabs and adopt their state without
+// re-broadcasting (loop) or re-pushing (the originating tab already does it).
+if (channel) {
+  channel.onmessage = (e: MessageEvent<CartMessage>) => {
+    const msg = e.data
+    if (!msg || msg.type !== 'cart-update' || !Array.isArray(msg.lines)) return
+    save(msg.lines)
+    useCart.setState({ lines: msg.lines })
+    cancelPendingPush()
+  }
+}
