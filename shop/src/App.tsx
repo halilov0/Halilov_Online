@@ -17,13 +17,22 @@ import { InfoPage } from './pages/InfoPage'
 import { FavoritesPage } from './pages/FavoritesPage'
 import { AccountPage } from './pages/AccountPage'
 import { useAuth } from './auth/authStore'
+import { useCart } from './cart/cartStore'
+import { getToken } from './api'
 
 function App() {
   const fetchMe = useAuth(s => s.fetchMe)
   const loc = useLocation()
 
   useEffect(() => {
-    fetchMe()
+    // Validate the persisted token, then hydrate the cart from the server so
+    // changes made in other tabs/devices show up on this mount.
+    ;(async () => {
+      await fetchMe()
+      if (getToken()) {
+        await useCart.getState().loadFromRemote()
+      }
+    })()
   }, [fetchMe])
 
   // Auth pages render their own split layout (no global header)

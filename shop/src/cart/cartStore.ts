@@ -1,7 +1,12 @@
 import { create } from 'zustand'
-import type { Product } from '../api'
+import {
+  api, getToken,
+  type CartLineView, type CartReplaceRequest, type Product,
+} from '../api'
 
 const STORAGE_KEY = 'halilov.cart'
+// Coalesce rapid +/- clicks into a single PUT to avoid spamming the backend.
+const PUSH_DEBOUNCE_MS = 350
 
 export type CartLine = {
   productId: number
@@ -17,7 +22,16 @@ type CartState = {
   add: (p: Product, quantity?: number) => void
   setQty: (productId: number, quantity: number) => void
   remove: (productId: number) => void
-  clear: () => void
+  /** Wipe local lines only. Use clearAll() to also drop the server cart. */
+  clearLocal: () => void
+  /** Wipe local + server cart. Use after a successful checkout. */
+  clearAll: () => Promise<void>
+  /** Pull canonical cart from the server (call on App mount with valid token). */
+  loadFromRemote: () => Promise<void>
+  /** Merge local lines into the server cart and adopt the merged result. */
+  mergeWithRemote: () => Promise<void>
+  /** Best-effort flush of current local state to the server. */
+  pushToRemote: () => Promise<void>
   totalItems: () => number
   subtotalAgorot: () => number
 }
@@ -45,6 +59,28 @@ function save(lines: CartLine[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(lines))
 }
 
+function toCartLine(v: CartLineView): CartLine {
+  return {
+    productId: v.productId,
+    slug: v.slug,
+    nameHe: v.nameHe,
+    priceAgorot: v.priceAgorot,
+    quantity: v.quantity,
+    imageUrl: v.imageUrl,
+  }
+}
+
+let pushTimer: number | null = null
+
+function schedulePush(push: () => Promise<void>) {
+  if (!getToken()) return
+  if (pushTimer !== null) clearTimeout(pushTimer)
+  pushTimer = window.setTimeout(() => {
+    pushTimer = null
+    push().catch(() => { /* sync failures must not disrupt the UI */ })
+  }, PUSH_DEBOUNCE_MS)
+}
+
 export const useCart = create<CartState>((set, get) => ({
   lines: load(),
 
@@ -65,6 +101,7 @@ export const useCart = create<CartState>((set, get) => ({
     }
     save(lines)
     set({ lines })
+    schedulePush(() => get().pushToRemote())
   },
 
   setQty(productId, quantity) {
@@ -74,17 +111,73 @@ export const useCart = create<CartState>((set, get) => ({
     )
     save(lines)
     set({ lines })
+    schedulePush(() => get().pushToRemote())
   },
 
   remove(productId) {
     const lines = get().lines.filter(l => l.productId !== productId)
     save(lines)
     set({ lines })
+    schedulePush(() => get().pushToRemote())
   },
 
-  clear() {
+  clearLocal() {
     save([])
     set({ lines: [] })
+  },
+
+  async clearAll() {
+    save([])
+    set({ lines: [] })
+    if (!getToken()) return
+    try {
+      await api('/api/cart', { method: 'DELETE' })
+    } catch {
+      // ignore — local is the user-visible truth, server will catch up next push
+    }
+  },
+
+  async loadFromRemote() {
+    if (!getToken()) return
+    try {
+      const remote = await api<CartLineView[]>('/api/cart')
+      const lines = remote.map(toCartLine)
+      save(lines)
+      set({ lines })
+    } catch {
+      // leave local intact on failure
+    }
+  },
+
+  async mergeWithRemote() {
+    if (!getToken()) return
+    const items = get().lines.map(l => ({ productId: l.productId, quantity: l.quantity }))
+    const body: CartReplaceRequest = { items }
+    try {
+      const merged = await api<CartLineView[]>('/api/cart/merge', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+      const lines = merged.map(toCartLine)
+      save(lines)
+      set({ lines })
+    } catch {
+      // ignore — keep local cart as-is
+    }
+  },
+
+  async pushToRemote() {
+    if (!getToken()) return
+    const items = get().lines.map(l => ({ productId: l.productId, quantity: l.quantity }))
+    const body: CartReplaceRequest = { items }
+    try {
+      await api('/api/cart', {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      })
+    } catch {
+      // ignore — debounced retry happens on next mutation
+    }
   },
 
   totalItems() {

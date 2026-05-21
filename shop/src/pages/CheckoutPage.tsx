@@ -41,7 +41,7 @@ function splitPhone(raw: string): { prefix: string; number: string } {
 }
 
 export function CheckoutPage() {
-  const { lines, subtotalAgorot, clear } = useCart()
+  const { lines, subtotalAgorot, clearAll } = useCart()
   const { user } = useAuth()
   const nav = useNavigate()
 
@@ -277,11 +277,11 @@ export function CheckoutPage() {
         { method: 'POST' }
       )
       if (pay.redirectUrl.startsWith('http://') || pay.redirectUrl.startsWith('https://')) {
-        clear()
+        void clearAll()
         window.location.href = pay.redirectUrl
       } else {
         nav(pay.redirectUrl)
-        setTimeout(clear, 50)
+        setTimeout(() => { void clearAll() }, 50)
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'שגיאה ביצירת ההזמנה')

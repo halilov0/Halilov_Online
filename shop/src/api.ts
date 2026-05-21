@@ -222,3 +222,18 @@ export type OrderView = {
 export function canCustomerCancel(status: OrderView['status']): boolean {
   return status === 'PENDING' || status === 'PAID' || status === 'FULFILLED'
 }
+
+// ----- cart sync -----
+
+export type CartLineView = {
+  productId: number
+  slug: string
+  nameHe: string
+  priceAgorot: number
+  quantity: number
+  stockQty: number
+  imageUrl: string | null
+}
+
+export type CartUpsertItem = { productId: number; quantity: number }
+export type CartReplaceRequest = { items: CartUpsertItem[] }
