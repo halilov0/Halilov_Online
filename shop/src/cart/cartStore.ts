@@ -235,14 +235,49 @@ export const useCart = create<CartState>((set, get) => ({
   },
 }))
 
-// Receive broadcasts from other tabs and adopt their state without
+// Receive cart updates from other tabs and adopt their state without
 // re-broadcasting (loop) or re-pushing (the originating tab already does it).
+//
+// Two listeners for redundancy:
+//   - BroadcastChannel: low-latency, modern browsers.
+//   - StorageEvent: free fallback — fires in every other same-origin tab
+//     whenever localStorage changes (we save() on every mutation anyway).
+//
+// applyLinesFromExternal() dedupes via a stringified signature so a second
+// listener firing with the same payload is a no-op.
+let lastExternalSignature: string | null = null
+
+function applyLinesFromExternal(rawJson: string) {
+  if (rawJson === lastExternalSignature) return
+  let parsed: unknown
+  try { parsed = JSON.parse(rawJson) } catch { return }
+  if (!Array.isArray(parsed)) return
+  lastExternalSignature = rawJson
+  const lines = parsed as CartLine[]
+  // Sync localStorage so a subsequent reload reflects the latest state even
+  // if BroadcastChannel was the path that got us here.
+  localStorage.setItem(STORAGE_KEY, rawJson)
+  useCart.setState({ lines })
+  cancelPendingPush()
+}
+
 if (channel) {
   channel.onmessage = (e: MessageEvent<CartMessage>) => {
     const msg = e.data
     if (!msg || msg.type !== 'cart-update' || !Array.isArray(msg.lines)) return
-    save(msg.lines)
-    useCart.setState({ lines: msg.lines })
-    cancelPendingPush()
+    applyLinesFromExternal(JSON.stringify(msg.lines))
   }
 }
+
+window.addEventListener('storage', (e) => {
+  if (e.key !== STORAGE_KEY) return
+  if (e.newValue === null) {
+    // Other tab cleared the cart (logout / checkout).
+    if (lastExternalSignature === '[]') return
+    lastExternalSignature = '[]'
+    useCart.setState({ lines: [] })
+    cancelPendingPush()
+    return
+  }
+  applyLinesFromExternal(e.newValue)
+})
