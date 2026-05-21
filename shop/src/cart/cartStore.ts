@@ -281,3 +281,18 @@ window.addEventListener('storage', (e) => {
   }
   applyLinesFromExternal(e.newValue)
 })
+
+// Cross-device sync: when the user returns to the tab (switching from
+// phone → PC or vice versa), pull the canonical cart from the server.
+// Throttled so quick tab-flipping doesn't spam the backend.
+const FOCUS_REFRESH_MIN_MS = 3000
+let lastFocusRefreshAt = 0
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return
+  if (!getToken()) return
+  const now = Date.now()
+  if (now - lastFocusRefreshAt < FOCUS_REFRESH_MIN_MS) return
+  lastFocusRefreshAt = now
+  useCart.getState().loadFromRemote()
+})
