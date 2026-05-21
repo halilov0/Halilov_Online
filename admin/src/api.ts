@@ -105,7 +105,7 @@ export type OrderView = {
   discountAgorot: number; couponCode: string | null
   totalAgorot: number
   items: OrderItemView[]; shipping: ShippingView | null; createdAt: string
-  deliveryMethod: 'COURIER' | 'PICKUP'
+  deliveryMethod: 'COURIER'
   cancelledAt: string | null; cancellationReason: string | null
   cancelledBy: 'CUSTOMER' | 'ADMIN' | 'SYSTEM' | null
   refundedAt: string | null; refundAmountAgorot: number | null

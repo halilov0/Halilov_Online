@@ -64,15 +64,13 @@ public class OrderService {
         User user = users.findByEmail(email)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no user"));
 
-        DeliveryMethod method = req.deliveryMethod() != null ? req.deliveryMethod() : DeliveryMethod.COURIER;
+        DeliveryMethod method = DeliveryMethod.COURIER;
         OrderDtos.ShippingRequest ship = req.shipping();
-        if (method == DeliveryMethod.COURIER) {
-            if (ship == null
-                || ship.street() == null || ship.street().isBlank()
-                || ship.city() == null || ship.city().isBlank()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "courier delivery requires shipping address");
-            }
+        if (ship == null
+            || ship.street() == null || ship.street().isBlank()
+            || ship.city() == null || ship.city().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "courier delivery requires shipping address");
         }
 
         // Load all products for the items in one go

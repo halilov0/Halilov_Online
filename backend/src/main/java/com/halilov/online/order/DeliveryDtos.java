@@ -13,7 +13,5 @@ public class DeliveryDtos {
         int freeAboveAgorot
     ) {}
 
-    public record PickupInfo(String address, String hours, String phone) {}
-
-    public record Quote(List<Option> options, PickupInfo pickup) {}
+    public record Quote(List<Option> options) {}
 }

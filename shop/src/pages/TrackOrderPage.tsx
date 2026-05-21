@@ -241,19 +241,12 @@ function OrderCard({
                 background: 'var(--surface)', borderRadius: 'var(--r-md)',
                 fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.6,
               }}>
-                <div style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 4 }}>
-                  {order.deliveryMethod === 'PICKUP' ? 'איסוף עצמי' : 'כתובת למשלוח'}
-                </div>
-                {order.shipping.fullName} · <span className="mono">{order.shipping.phone}</span>
-                {order.deliveryMethod !== 'PICKUP' && (
-                  <>
-                    <br />
-                    רחוב {order.shipping.street} {order.shipping.houseNo}
-                    {order.shipping.apartment && `, דירה ${order.shipping.apartment}`}<br />
-                    {order.shipping.city}
-                    {order.shipping.postalCode && ` · ${order.shipping.postalCode}`}
-                  </>
-                )}
+                <div style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 4 }}>כתובת למשלוח</div>
+                {order.shipping.fullName} · <span className="mono">{order.shipping.phone}</span><br />
+                רחוב {order.shipping.street} {order.shipping.houseNo}
+                {order.shipping.apartment && `, דירה ${order.shipping.apartment}`}<br />
+                {order.shipping.city}
+                {order.shipping.postalCode && ` · ${order.shipping.postalCode}`}
               </div>
             )}
             {order.status !== 'PENDING' && order.status !== 'CANCELLED' && (

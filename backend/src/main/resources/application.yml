@@ -48,10 +48,6 @@ app:
   delivery:
     courierFlatAgorot: ${DELIVERY_COURIER_AGOROT:1990}
     freeAboveAgorot:   ${DELIVERY_FREE_ABOVE_AGOROT:30000}
-    pickup:
-      address: ${PICKUP_ADDRESS:רחוב הרצל 1, באר שבע}
-      hours:   ${PICKUP_HOURS:א'-ה' 09:00-18:00, ו' 09:00-13:00}
-      phone:   ${PICKUP_PHONE:}
   media:
     storage: ${MEDIA_STORAGE:local}
     localDir: ${MEDIA_DIR:./media}

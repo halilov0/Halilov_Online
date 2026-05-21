@@ -77,16 +77,6 @@ export function OrderDetailPage() {
             <span>{dateStr}</span>
             <span style={{ color: 'var(--line-2)' }}>·</span>
             <StatusPill s={order.status} />
-            <span style={{ color: 'var(--line-2)' }}>·</span>
-            <span
-              style={{
-                fontSize: 12, padding: '3px 9px',
-                background: 'var(--paper-2, #f5f3ef)', borderRadius: 99,
-                color: 'var(--ink-2)',
-              }}
-            >
-              {order.deliveryMethod === 'PICKUP' ? 'איסוף עצמי' : 'שליח עד הבית'}
-            </span>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -250,44 +240,26 @@ export function OrderDetailPage() {
                 </div>
               </div>
 
-              {order.deliveryMethod === 'PICKUP' ? (
-                <div className="adm-card">
-                  <div className="hm-label" style={{ marginBottom: 10 }}>איסוף עצמי</div>
-                  <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--ink-2)' }}>
-                    אין משלוח — הלקוח אוסף מנקודת האיסוף.
-                  </div>
-                  {order.shipping?.notes && (
-                    <div style={{
-                      marginTop: 10, padding: 10, fontSize: 12,
-                      background: 'var(--paper-2)', borderRadius: 'var(--r-sm)',
-                      color: 'var(--ink-2)',
-                    }}>
-                      {order.shipping.notes}
-                    </div>
-                  )}
+              <div className="adm-card">
+                <div className="hm-label" style={{ marginBottom: 10 }}>כתובת למשלוח</div>
+                <div style={{ fontSize: 13, lineHeight: 1.6 }}>
+                  {order.shipping.fullName}<br />
+                  <span className="mono">{order.shipping.phone}</span><br />
+                  רחוב {order.shipping.street} {order.shipping.houseNo}
+                  {order.shipping.apartment && `, דירה ${order.shipping.apartment}`}<br />
+                  {order.shipping.city}
+                  {order.shipping.postalCode && <> <span className="mono">{order.shipping.postalCode}</span></>}
                 </div>
-              ) : (
-                <div className="adm-card">
-                  <div className="hm-label" style={{ marginBottom: 10 }}>כתובת למשלוח</div>
-                  <div style={{ fontSize: 13, lineHeight: 1.6 }}>
-                    {order.shipping.fullName}<br />
-                    <span className="mono">{order.shipping.phone}</span><br />
-                    רחוב {order.shipping.street} {order.shipping.houseNo}
-                    {order.shipping.apartment && `, דירה ${order.shipping.apartment}`}<br />
-                    {order.shipping.city}
-                    {order.shipping.postalCode && <> <span className="mono">{order.shipping.postalCode}</span></>}
+                {order.shipping.notes && (
+                  <div style={{
+                    marginTop: 10, padding: 10, fontSize: 12,
+                    background: 'var(--paper-2)', borderRadius: 'var(--r-sm)',
+                    color: 'var(--ink-2)',
+                  }}>
+                    {order.shipping.notes}
                   </div>
-                  {order.shipping.notes && (
-                    <div style={{
-                      marginTop: 10, padding: 10, fontSize: 12,
-                      background: 'var(--paper-2)', borderRadius: 'var(--r-sm)',
-                      color: 'var(--ink-2)',
-                    }}>
-                      {order.shipping.notes}
-                    </div>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
             </>
           )}
 

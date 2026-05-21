@@ -148,11 +148,11 @@ export type ShippingRequest = {
   notes?: string
 }
 
-export type DeliveryMethod = 'COURIER' | 'PICKUP'
+export type DeliveryMethod = 'COURIER'
 
 export type CreateOrderRequest = {
   items: OrderItemRequest[]
-  shipping?: ShippingRequest
+  shipping: ShippingRequest
   deliveryMethod: DeliveryMethod
   couponCode?: string
 }
@@ -168,7 +168,6 @@ export type DeliveryOption = {
 
 export type DeliveryQuote = {
   options: DeliveryOption[]
-  pickup: { address: string; hours: string; phone: string }
 }
 
 export type CouponType = 'PERCENT' | 'FIXED'

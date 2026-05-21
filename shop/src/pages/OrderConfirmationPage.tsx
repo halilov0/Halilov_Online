@@ -98,27 +98,15 @@ export function OrderConfirmationPage() {
 
         {order.shipping && (
           <div className="cls-ship-card">
-            <div className="ico-circle">
-              <Icon name={order.deliveryMethod === 'PICKUP' ? 'pin' : 'truck'} size={20} />
-            </div>
+            <div className="ico-circle"><Icon name="truck" size={20} /></div>
             <div style={{ flex: 1 }}>
-              <h4 style={{ marginBottom: 4 }}>
-                {order.deliveryMethod === 'PICKUP' ? 'איסוף עצמי' : 'כתובת למשלוח'}
-              </h4>
+              <h4 style={{ marginBottom: 4 }}>כתובת למשלוח</h4>
               <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.6 }}>
-                {order.shipping.fullName} · <span className="mono">{order.shipping.phone}</span>
-                {order.deliveryMethod !== 'PICKUP' && (
-                  <>
-                    <br />
-                    רחוב {order.shipping.street} {order.shipping.houseNo}
-                    {order.shipping.apartment && `, דירה ${order.shipping.apartment}`}<br />
-                    {order.shipping.city}
-                    {order.shipping.postalCode && ` · ${order.shipping.postalCode}`}
-                  </>
-                )}
-                {order.deliveryMethod === 'PICKUP' && (
-                  <><br /><em style={{ color: 'var(--ink-3)' }}>פרטי איסוף יישלחו במייל כשההזמנה תוכן.</em></>
-                )}
+                {order.shipping.fullName} · <span className="mono">{order.shipping.phone}</span><br />
+                רחוב {order.shipping.street} {order.shipping.houseNo}
+                {order.shipping.apartment && `, דירה ${order.shipping.apartment}`}<br />
+                {order.shipping.city}
+                {order.shipping.postalCode && ` · ${order.shipping.postalCode}`}
                 {order.shipping.notes && (
                   <><br /><em style={{ color: 'var(--ink-3)' }}>"{order.shipping.notes}"</em></>
                 )}
