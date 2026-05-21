@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { api, setToken, getToken, type AuthResponse, type Me } from '../api'
+import { api, ApiError, setToken, getToken, type AuthResponse, type Me } from '../api'
 
 type AuthState = {
   token: string | null
@@ -59,9 +59,13 @@ export const useAuth = create<AuthState>((set, get) => ({
       } else {
         set({ user: me })
       }
-    } catch {
-      setToken(null)
-      set({ token: null, user: null })
+    } catch (e) {
+      // Only treat real auth failures (401/403) as a logout. 429/5xx/network
+      // blips must not nuke the session.
+      if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+        setToken(null)
+        set({ token: null, user: null })
+      }
     } finally {
       set({ bootstrapped: true })
     }
