@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { api, formatPrice, getGuestOrderToken, rememberGuestOrder, type OrderView } from '../api'
+import { api, ApiError, formatPrice, getGuestOrderToken, rememberGuestOrder, type OrderView } from '../api'
 import { Icon } from '../components/Icon'
 import { Footer } from '../components/Footer'
+import { QuickLogin } from '../components/QuickLogin'
 import { useAuth } from '../auth/authStore'
 
 export function OrderConfirmationPage() {
@@ -10,6 +11,8 @@ export function OrderConfirmationPage() {
   const [searchParams] = useSearchParams()
   const [order, setOrder] = useState<OrderView | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [needsLogin, setNeedsLogin] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const { user } = useAuth()
   const nav = useNavigate()
 
@@ -20,11 +23,33 @@ export function OrderConfirmationPage() {
     // shared api() helper can attach the X-Guest-Token header.
     const urlToken = searchParams.get('t')
     if (urlToken) rememberGuestOrder(orderNumber, urlToken)
+    setError(null); setNeedsLogin(false)
     api<OrderView>(`/api/orders/${orderNumber}`)
       .then(setOrder)
-      .catch(e => setError(e.message))
-  }, [orderNumber, searchParams])
+      .catch(e => {
+        // 401 = registered-account order opened without a session. Offer
+        // an inline login instead of a dead-end error.
+        if (e instanceof ApiError && e.status === 401) {
+          setNeedsLogin(true)
+        } else {
+          setError(e.message)
+        }
+      })
+  }, [orderNumber, searchParams, reloadKey])
 
+  if (needsLogin) {
+    return (
+      <>
+        <div className="cls-page-narrow">
+          <QuickLogin
+            message="ההזמנה משויכת לחשבון. התחברו כדי לצפות בפרטים ובחשבונית."
+            onSuccess={() => { setNeedsLogin(false); setReloadKey(k => k + 1) }}
+          />
+        </div>
+        <Footer />
+      </>
+    )
+  }
   if (error) return <div className="cls-page"><div className="hm-error">{error}</div></div>
   if (!order) return <div className="cls-page"><p style={{ color: 'var(--ink-3)' }}>טוען…</p></div>
 

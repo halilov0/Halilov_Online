@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { api, formatPrice, rememberGuestOrder, type OrderView } from '../api'
+import { api, ApiError, formatPrice, rememberGuestOrder, type OrderView } from '../api'
 import { Icon } from '../components/Icon'
+import { QuickLogin } from '../components/QuickLogin'
 
 export function InvoicePage() {
   const { orderNumber } = useParams<{ orderNumber: string }>()
@@ -9,15 +10,24 @@ export function InvoicePage() {
   const nav = useNavigate()
   const [order, setOrder] = useState<OrderView | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [needsLogin, setNeedsLogin] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     if (!orderNumber) return
     const urlToken = searchParams.get('t')
     if (urlToken) rememberGuestOrder(orderNumber, urlToken)
+    setError(null); setNeedsLogin(false)
     api<OrderView>(`/api/orders/${orderNumber}`)
       .then(setOrder)
-      .catch(e => setError(e.message))
-  }, [orderNumber, searchParams])
+      .catch(e => {
+        if (e instanceof ApiError && e.status === 401) {
+          setNeedsLogin(true)
+        } else {
+          setError(e.message)
+        }
+      })
+  }, [orderNumber, searchParams, reloadKey])
 
   // Auto-open print dialog once the order data is rendered.
   // Small timeout lets the layout settle before print preview captures it.
@@ -27,6 +37,16 @@ export function InvoicePage() {
     return () => clearTimeout(t)
   }, [order])
 
+  if (needsLogin) {
+    return (
+      <div className="cls-page-narrow">
+        <QuickLogin
+          message="ההזמנה משויכת לחשבון. התחברו כדי להוריד את החשבונית."
+          onSuccess={() => { setNeedsLogin(false); setReloadKey(k => k + 1) }}
+        />
+      </div>
+    )
+  }
   if (error) {
     return (
       <div className="cls-page-narrow">
