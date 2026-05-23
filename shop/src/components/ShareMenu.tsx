@@ -10,6 +10,14 @@ type Props = {
   title: string
   /** Pre-filled message body for text-based targets. URL gets appended. */
   message: string
+  /**
+   * Optional PDF source. When supplied, the sheet shows a "PDF" download
+   * tile and — on browsers that support it — attaches the file to the
+   * native share sheet instead of just text+URL. Most desktop targets
+   * (WhatsApp Web, Telegram Desktop) still can't take files via
+   * deeplink, so those tiles continue to share text+link.
+   */
+  getPdf?: () => Promise<{ blob: Blob; filename: string }>
 }
 
 type Platform = {
@@ -85,8 +93,9 @@ const PLATFORMS: Platform[] = [
   },
 ]
 
-export function ShareMenu({ open, onClose, url, title, message }: Props) {
+export function ShareMenu({ open, onClose, url, title, message, getPdf }: Props) {
   const [hasNative, setHasNative] = useState(false)
+  const [busy, setBusy] = useState<string | null>(null)
 
   // navigator.share is only useful on mobile / Safari — feature-detect at
   // mount so SSR-style first paints don't render an unreachable button.
@@ -114,10 +123,46 @@ export function ShareMenu({ open, onClose, url, title, message }: Props) {
 
   async function nativeShare() {
     try {
+      setBusy('native')
+      // Prefer attaching the actual PDF if the platform allows it. We
+      // probe canShare({ files }) because Chrome on desktop returns true
+      // for `share` but refuses files — so the URL fallback is needed.
+      if (getPdf && typeof navigator.canShare === 'function') {
+        const { blob, filename } = await getPdf()
+        const file = new File([blob], filename, { type: 'application/pdf' })
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ title, text: message, files: [file] })
+          onClose()
+          return
+        }
+      }
       await navigator.share({ title, text: message, url })
       onClose()
     } catch {
       /* user cancelled */
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function downloadPdf() {
+    if (!getPdf) return
+    try {
+      setBusy('pdf')
+      const { blob, filename } = await getPdf()
+      const objectUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = objectUrl
+      a.download = filename
+      document.body.appendChild(a); a.click(); a.remove()
+      // Revoke a tick later so the download has time to register.
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+      useToast.getState().push('ה-PDF הורד. צרפו אותו לצ׳אט.')
+      onClose()
+    } catch (e) {
+      useToast.getState().push(e instanceof Error ? e.message : 'שגיאה ביצירת PDF')
+    } finally {
+      setBusy(null)
     }
   }
 
@@ -130,13 +175,26 @@ export function ShareMenu({ open, onClose, url, title, message }: Props) {
             <Icon name="x" size={16} stroke={2.2} />
           </button>
         </div>
+        {getPdf && (
+          <p className="cls-share-hint">
+            הקישור פותח את החשבונית בדפדפן. להורדה כקובץ PDF, לחצו "PDF".
+          </p>
+        )}
         <div className="cls-share-grid">
+          {getPdf && (
+            <button type="button" className="cls-share-tile" onClick={downloadPdf} disabled={busy !== null}>
+              <span className="ico" style={{ background: '#ef4444', color: '#fff' }}>
+                <Icon name="pkg" size={20} />
+              </span>
+              <span className="lbl">{busy === 'pdf' ? 'מכין…' : 'PDF'}</span>
+            </button>
+          )}
           {hasNative && (
-            <button type="button" className="cls-share-tile" onClick={nativeShare}>
+            <button type="button" className="cls-share-tile" onClick={nativeShare} disabled={busy !== null}>
               <span className="ico" style={{ background: 'var(--ink)', color: '#fff' }}>
                 <Icon name="share" size={20} />
               </span>
-              <span className="lbl">עוד…</span>
+              <span className="lbl">{busy === 'native' ? 'מכין…' : 'עוד…'}</span>
             </button>
           )}
           {PLATFORMS.map(p => {

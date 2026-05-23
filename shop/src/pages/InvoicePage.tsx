@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, ApiError, formatPrice, getGuestOrderToken, rememberGuestOrder, type OrderView } from '../api'
 import { Icon } from '../components/Icon'
@@ -6,6 +6,7 @@ import { QuickLogin } from '../components/QuickLogin'
 import { ShareMenu } from '../components/ShareMenu'
 import { useToast } from '../components/Toast'
 import { useAuth } from '../auth/authStore'
+import { generateInvoicePdfBlob } from '../lib/invoicePdf'
 
 export function InvoicePage() {
   const { orderNumber } = useParams<{ orderNumber: string }>()
@@ -19,6 +20,7 @@ export function InvoicePage() {
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
   const { user } = useAuth()
+  const invoiceRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     if (!orderNumber) return
@@ -118,10 +120,14 @@ export function InvoicePage() {
           url={shareUrl}
           title={`חשבונית ${order.orderNumber} · חלילוב אונליין`}
           message={`חשבונית מהזמנה ${order.orderNumber} בחלילוב אונליין`}
+          getPdf={async () => {
+            if (!invoiceRef.current) throw new Error('החשבונית עוד לא נטענה')
+            return generateInvoicePdfBlob(invoiceRef.current, order.orderNumber)
+          }}
         />
       )}
 
-      <article className="cls-invoice" lang="he" dir="rtl">
+      <article className="cls-invoice" lang="he" dir="rtl" ref={invoiceRef}>
         <header className="hdr">
           <div className="brand">
             <span className="mark">ח</span>

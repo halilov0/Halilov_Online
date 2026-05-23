@@ -2568,11 +2568,21 @@ select.hm-input { appearance: none; background-image: linear-gradient(45deg, tra
   color: var(--ink-2);
 }
 .cls-share-head .close:hover { background: var(--line); }
+.cls-share-hint {
+  font-size: 12px;
+  color: var(--ink-3);
+  margin: -8px 0 14px;
+  line-height: 1.5;
+  background: var(--surface);
+  padding: 8px 12px;
+  border-radius: var(--r-md);
+}
 .cls-share-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(82px, 1fr));
   gap: 12px;
 }
+.cls-share-tile:disabled { opacity: 0.55; cursor: default; }
 .cls-share-tile {
   background: transparent;
   border: none;
