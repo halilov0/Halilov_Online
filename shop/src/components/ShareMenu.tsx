@@ -95,11 +95,25 @@ const PLATFORMS: Platform[] = [
 
 export function ShareMenu({ open, onClose, url, title, message, getPdf }: Props) {
   const [hasNative, setHasNative] = useState(false)
+  const [canShareFile, setCanShareFile] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
 
-  // navigator.share is only useful on mobile / Safari — feature-detect at
-  // mount so SSR-style first paints don't render an unreachable button.
-  useEffect(() => { setHasNative(typeof navigator !== 'undefined' && 'share' in navigator) }, [])
+  // Feature-detect at mount. canShare({ files }) reliably tells us whether
+  // the OS share sheet will accept a real PDF attachment — Android Chrome
+  // and iOS Safari 16+ say yes; desktop Chromium says no. We probe with a
+  // zero-byte placeholder so we don't trigger PDF generation just to check.
+  useEffect(() => {
+    if (typeof navigator === 'undefined') return
+    setHasNative('share' in navigator)
+    if (getPdf && typeof navigator.canShare === 'function') {
+      try {
+        const probe = new File([new Uint8Array(0)], 'probe.pdf', { type: 'application/pdf' })
+        setCanShareFile(navigator.canShare({ files: [probe] }))
+      } catch {
+        setCanShareFile(false)
+      }
+    }
+  }, [getPdf])
 
   // Dismiss on Escape — the rest is handled by the backdrop click.
   useEffect(() => {
@@ -121,25 +135,39 @@ export function ShareMenu({ open, onClose, url, title, message, getPdf }: Props)
     encodedTitle: encodeURIComponent(title),
   }
 
+  /**
+   * Open the OS share sheet with the PDF attached. Used both by the
+   * "more apps" tile and — on mobile — by the platform-specific tiles
+   * (WhatsApp/Telegram/Email/SMS), because wa.me / mailto / sms: URLs
+   * are text-only and can't deliver an attachment any other way.
+   * Returns true on a real send (close menu), false on cancel or fallback.
+   */
+  async function shareFileNative(key: string): Promise<boolean> {
+    if (!getPdf) return false
+    try {
+      setBusy(key)
+      const { blob, filename } = await getPdf()
+      const file = new File([blob], filename, { type: 'application/pdf' })
+      if (!navigator.canShare?.({ files: [file] })) return false
+      await navigator.share({ title, text: message, files: [file] })
+      return true
+    } catch {
+      // AbortError = user dismissed share sheet — that's a deliberate cancel.
+      return false
+    } finally {
+      setBusy(null)
+    }
+  }
+
   async function nativeShare() {
+    if (await shareFileNative('native')) { onClose(); return }
+    // No file-share support — fall back to plain text+url native share.
     try {
       setBusy('native')
-      // Prefer attaching the actual PDF if the platform allows it. We
-      // probe canShare({ files }) because Chrome on desktop returns true
-      // for `share` but refuses files — so the URL fallback is needed.
-      if (getPdf && typeof navigator.canShare === 'function') {
-        const { blob, filename } = await getPdf()
-        const file = new File([blob], filename, { type: 'application/pdf' })
-        if (navigator.canShare({ files: [file] })) {
-          await navigator.share({ title, text: message, files: [file] })
-          onClose()
-          return
-        }
-      }
       await navigator.share({ title, text: message, url })
       onClose()
     } catch {
-      /* user cancelled */
+      /* cancelled */
     } finally {
       setBusy(null)
     }
@@ -177,7 +205,9 @@ export function ShareMenu({ open, onClose, url, title, message, getPdf }: Props)
         </div>
         {getPdf && (
           <p className="cls-share-hint">
-            הקישור פותח את החשבונית בדפדפן. להורדה כקובץ PDF, לחצו "PDF".
+            {canShareFile
+              ? 'בחירת אפליקציה תשלח את החשבונית כקובץ PDF.'
+              : 'כדי לשלוח את החשבונית כקובץ, לחצו "PDF" להורדה, ואז צרפו אותה לצ׳אט. שאר הכפתורים שולחים קישור לצפייה בדפדפן.'}
           </p>
         )}
         <div className="cls-share-grid">
@@ -189,7 +219,7 @@ export function ShareMenu({ open, onClose, url, title, message, getPdf }: Props)
               <span className="lbl">{busy === 'pdf' ? 'מכין…' : 'PDF'}</span>
             </button>
           )}
-          {hasNative && (
+          {hasNative && !canShareFile && (
             <button type="button" className="cls-share-tile" onClick={nativeShare} disabled={busy !== null}>
               <span className="ico" style={{ background: 'var(--ink)', color: '#fff' }}>
                 <Icon name="share" size={20} />
@@ -199,6 +229,19 @@ export function ShareMenu({ open, onClose, url, title, message, getPdf }: Props)
           )}
           {PLATFORMS.map(p => {
             const handle = async () => {
+              // On mobile with file-share support, every platform tile routes
+              // through the OS share sheet with the PDF attached — that's
+              // the only path that actually delivers a real attachment to
+              // WhatsApp/Telegram/etc. The user picks the same platform
+              // again from the OS sheet; the file goes through.
+              // "Copy" stays as-is — it has no file semantics.
+              if (canShareFile && p.key !== 'copy') {
+                const sent = await shareFileNative(p.key)
+                if (sent) { onClose(); return }
+                // If canShare claimed support but share threw / was cancelled,
+                // don't pop a useless wa.me window — let the user retry.
+                return
+              }
               if (p.onClick) await p.onClick(ctx)
               else if (p.href) {
                 const href = p.href(ctx)
@@ -213,11 +256,11 @@ export function ShareMenu({ open, onClose, url, title, message, getPdf }: Props)
               onClose()
             }
             return (
-              <button type="button" key={p.key} className="cls-share-tile" onClick={handle}>
+              <button type="button" key={p.key} className="cls-share-tile" onClick={handle} disabled={busy !== null}>
                 <span className="ico" style={{ background: p.brand, color: '#fff' }}>
                   {p.icon}
                 </span>
-                <span className="lbl">{p.label}</span>
+                <span className="lbl">{busy === p.key ? 'מכין…' : p.label}</span>
               </button>
             )
           })}
