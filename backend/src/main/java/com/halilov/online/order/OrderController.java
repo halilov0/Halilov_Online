@@ -46,6 +46,12 @@ public class OrderController {
         return orderService.getByToken(orderNumber, guestToken);
     }
 
+    @PostMapping("/{orderNumber}/share")
+    public OrderDtos.ShareTokenResponse share(Authentication auth, @PathVariable String orderNumber) {
+        requireAuth(auth);
+        return new OrderDtos.ShareTokenResponse(orderService.mintShareToken(auth.getName(), orderNumber));
+    }
+
     @PostMapping("/{orderNumber}/cancel")
     public OrderDtos.OrderView cancel(
         Authentication auth,

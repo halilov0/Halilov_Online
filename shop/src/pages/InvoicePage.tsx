@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { api, ApiError, formatPrice, rememberGuestOrder, type OrderView } from '../api'
+import { api, ApiError, formatPrice, getGuestOrderToken, rememberGuestOrder, type OrderView } from '../api'
 import { Icon } from '../components/Icon'
 import { QuickLogin } from '../components/QuickLogin'
+import { ShareMenu } from '../components/ShareMenu'
+import { useToast } from '../components/Toast'
+import { useAuth } from '../auth/authStore'
 
 export function InvoicePage() {
   const { orderNumber } = useParams<{ orderNumber: string }>()
@@ -12,6 +15,10 @@ export function InvoicePage() {
   const [error, setError] = useState<string | null>(null)
   const [needsLogin, setNeedsLogin] = useState<'unauth' | 'wrong-account' | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shareUrl, setShareUrl] = useState<string | null>(null)
+  const [sharing, setSharing] = useState(false)
+  const { user } = useAuth()
 
   useEffect(() => {
     if (!orderNumber) return
@@ -38,6 +45,30 @@ export function InvoicePage() {
     const t = setTimeout(() => window.print(), 250)
     return () => clearTimeout(t)
   }, [order])
+
+  async function openShare() {
+    if (!order) return
+    // Guest orders already have a token in their URL; reuse it. Registered
+    // owners need to mint a one-time share token via the backend so the
+    // recipient can view the invoice without our password.
+    let token = getGuestOrderToken(order.orderNumber)
+    if (!token && user) {
+      try {
+        setSharing(true)
+        const res = await api<{ shareToken: string }>(`/api/orders/${order.orderNumber}/share`, { method: 'POST' })
+        token = res.shareToken
+      } catch (e) {
+        useToast.getState().push(e instanceof Error ? e.message : 'שגיאה ביצירת קישור שיתוף')
+        setSharing(false)
+        return
+      } finally {
+        setSharing(false)
+      }
+    }
+    const base = `${window.location.origin}/invoice/${order.orderNumber}`
+    setShareUrl(token ? `${base}?t=${encodeURIComponent(token)}` : base)
+    setShareOpen(true)
+  }
 
   if (needsLogin) {
     const isMismatch = needsLogin === 'wrong-account'
@@ -74,8 +105,21 @@ export function InvoicePage() {
           <Icon name="pkg" size={14} stroke={2.2} />
           הדפס / שמור כ-PDF
         </button>
+        <button onClick={openShare} disabled={sharing}>
+          <Icon name="share" size={14} stroke={2.2} />
+          {sharing ? 'יוצר קישור…' : 'שיתוף'}
+        </button>
         <button onClick={() => nav(-1)}>חזרה</button>
       </div>
+      {shareOpen && shareUrl && (
+        <ShareMenu
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          url={shareUrl}
+          title={`חשבונית ${order.orderNumber} · חלילוב אונליין`}
+          message={`חשבונית מהזמנה ${order.orderNumber} בחלילוב אונליין`}
+        />
+      )}
 
       <article className="cls-invoice" lang="he" dir="rtl">
         <header className="hdr">

@@ -36,6 +36,8 @@ public class OrderDtos {
 
     public record CancelRequest(@Size(max = 500) String reason) {}
 
+    public record ShareTokenResponse(String shareToken) {}
+
     public record RefundRequest(
         @NotNull @Min(0) Integer amountAgorot,
         @Size(max = 500) String reason,

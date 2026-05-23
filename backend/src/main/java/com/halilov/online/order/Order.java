@@ -55,6 +55,9 @@ public class Order {
     @Column(name = "guest_token")
     private String guestToken;
 
+    @Column(name = "share_token")
+    private String shareToken;
+
     @Column(name = "payment_ref")
     private String paymentRef;
 
@@ -126,6 +129,8 @@ public class Order {
     public void setGuestEmail(String guestEmail) { this.guestEmail = guestEmail; }
     public String getGuestToken() { return guestToken; }
     public void setGuestToken(String guestToken) { this.guestToken = guestToken; }
+    public String getShareToken() { return shareToken; }
+    public void setShareToken(String shareToken) { this.shareToken = shareToken; }
     public String getPaymentRef() { return paymentRef; }
     public void setPaymentRef(String paymentRef) { this.paymentRef = paymentRef; }
     public String getInvoiceNumber() { return invoiceNumber; }

@@ -171,15 +171,44 @@ public class OrderService {
         return OrderDtos.OrderView.from(order, addr);
     }
 
-    /** Used by PaymentService to authorise guest payment calls. */
+    /**
+     * Used by PaymentService for guest payment calls, and by the read path
+     * for both guest checkout and registered-order share links — the token
+     * may match either the order's guest_token (guest checkout) or its
+     * share_token (owner-minted "send to accountant" link).
+     */
     public Order loadByGuestToken(String orderNumber, String token) {
         Order order = orders.findByOrderNumber(orderNumber)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "order not found"));
-        if (token == null || order.getGuestToken() == null
-            || !order.getGuestToken().equals(token)) {
+        if (token == null || !tokenMatches(order, token)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "order not found");
         }
         return order;
+    }
+
+    private static boolean tokenMatches(Order order, String token) {
+        return (order.getGuestToken() != null && order.getGuestToken().equals(token))
+            || (order.getShareToken() != null && order.getShareToken().equals(token));
+    }
+
+    /**
+     * Mints (or returns) the share-token for an order the caller owns.
+     * Idempotent — the same token is reused so revisiting "share" doesn't
+     * keep invalidating prior recipients.
+     */
+    @Transactional
+    public String mintShareToken(String email, String orderNumber) {
+        User user = users.findByEmail(email)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no user"));
+        Order order = orders.findByOrderNumber(orderNumber)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "order not found"));
+        if (!user.getId().equals(order.getUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "order not on this account");
+        }
+        if (order.getShareToken() == null) {
+            order.setShareToken(generateGuestToken());
+        }
+        return order.getShareToken();
     }
 
     @Transactional(readOnly = true)
