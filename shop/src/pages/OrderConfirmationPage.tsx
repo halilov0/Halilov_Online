@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
-import { api, formatPrice, type OrderView } from '../api'
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { api, formatPrice, getGuestOrderToken, rememberGuestOrder, type OrderView } from '../api'
 import { Icon } from '../components/Icon'
 import { Footer } from '../components/Footer'
 import { useAuth } from '../auth/authStore'
 
 export function OrderConfirmationPage() {
   const { orderNumber } = useParams<{ orderNumber: string }>()
+  const [searchParams] = useSearchParams()
   const [order, setOrder] = useState<OrderView | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { user } = useAuth()
@@ -14,10 +15,15 @@ export function OrderConfirmationPage() {
 
   useEffect(() => {
     if (!orderNumber) return
+    // Guest links carry the token in the URL so they survive across tabs
+    // and devices. Stash it into sessionStorage before the fetch so the
+    // shared api() helper can attach the X-Guest-Token header.
+    const urlToken = searchParams.get('t')
+    if (urlToken) rememberGuestOrder(orderNumber, urlToken)
     api<OrderView>(`/api/orders/${orderNumber}`)
       .then(setOrder)
       .catch(e => setError(e.message))
-  }, [orderNumber])
+  }, [orderNumber, searchParams])
 
   if (error) return <div className="cls-page"><div className="hm-error">{error}</div></div>
   if (!order) return <div className="cls-page"><p style={{ color: 'var(--ink-3)' }}>טוען…</p></div>
@@ -113,7 +119,7 @@ export function OrderConfirmationPage() {
                 )}
               </div>
             </div>
-            {!isCancelled && (
+            {!isCancelled && user && (
               <button
                 onClick={() => nav(`/track?orderNumber=${encodeURIComponent(order.orderNumber)}`)}
                 style={{
@@ -144,7 +150,7 @@ export function OrderConfirmationPage() {
           </Link>
           {order.status !== 'PENDING' && order.status !== 'CANCELLED' && (
             <Link
-              to={`/invoice/${order.orderNumber}`}
+              to={`/invoice/${order.orderNumber}${invoiceTokenQs(order.orderNumber)}`}
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -162,4 +168,9 @@ export function OrderConfirmationPage() {
       <Footer />
     </>
   )
+}
+
+function invoiceTokenQs(orderNumber: string): string {
+  const t = getGuestOrderToken(orderNumber)
+  return t ? `?t=${encodeURIComponent(t)}` : ''
 }

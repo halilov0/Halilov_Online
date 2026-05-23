@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
-import { api, formatPrice, type OrderView } from '../api'
+import { api, formatPrice, getGuestOrderToken, rememberGuestOrder, type OrderView } from '../api'
 import { Footer } from '../components/Footer'
 import { Icon } from '../components/Icon'
 
@@ -16,10 +16,14 @@ export function MockPaymentPage() {
 
   useEffect(() => {
     if (!orderNumber) { nav('/'); return }
+    // The pay-redirect URL carries ?t={guestToken} for anonymous checkouts —
+    // stash it before fetching so the order load + complete calls authorise.
+    const urlToken = params.get('t')
+    if (urlToken) rememberGuestOrder(orderNumber, urlToken)
     api<OrderView>(`/api/orders/${orderNumber}`)
       .then(setOrder)
       .catch(e => setError(e.message))
-  }, [orderNumber, nav])
+  }, [orderNumber, nav, params])
 
   async function complete(outcome: 'success' | 'cancel') {
     setBusy(true)
@@ -29,7 +33,12 @@ export function MockPaymentPage() {
         method: 'POST',
         body: JSON.stringify({ outcome }),
       })
-      nav(`/orders/${orderNumber}${outcome === 'success' ? '?paid=1' : '?cancelled=1'}`)
+      const guestToken = getGuestOrderToken(orderNumber)
+      const qs = new URLSearchParams()
+      if (outcome === 'success') qs.set('paid', '1')
+      else qs.set('cancelled', '1')
+      if (guestToken) qs.set('t', guestToken)
+      nav(`/orders/${orderNumber}?${qs.toString()}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'שגיאה')
       setBusy(false)

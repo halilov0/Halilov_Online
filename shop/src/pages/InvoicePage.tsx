@@ -1,20 +1,23 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { api, formatPrice, type OrderView } from '../api'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { api, formatPrice, rememberGuestOrder, type OrderView } from '../api'
 import { Icon } from '../components/Icon'
 
 export function InvoicePage() {
   const { orderNumber } = useParams<{ orderNumber: string }>()
+  const [searchParams] = useSearchParams()
   const nav = useNavigate()
   const [order, setOrder] = useState<OrderView | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!orderNumber) return
+    const urlToken = searchParams.get('t')
+    if (urlToken) rememberGuestOrder(orderNumber, urlToken)
     api<OrderView>(`/api/orders/${orderNumber}`)
       .then(setOrder)
       .catch(e => setError(e.message))
-  }, [orderNumber])
+  }, [orderNumber, searchParams])
 
   // Auto-open print dialog once the order data is rendered.
   // Small timeout lets the layout settle before print preview captures it.

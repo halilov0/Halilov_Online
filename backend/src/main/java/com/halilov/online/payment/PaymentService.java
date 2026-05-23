@@ -106,6 +106,7 @@ public class PaymentService {
     private String buildRedirectUrl(Order order) {
         // For real Grow: call Grow's "create payment process" API, return the
         // hosted-checkout URL it returns (including a session id Grow generates).
-        return "/payment/mock?order=" + order.getOrderNumber();
+        String base = "/payment/mock?order=" + order.getOrderNumber();
+        return order.getGuestToken() == null ? base : base + "&t=" + order.getGuestToken();
     }
 }

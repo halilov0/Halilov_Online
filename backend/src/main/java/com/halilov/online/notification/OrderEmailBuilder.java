@@ -31,9 +31,7 @@ public final class OrderEmailBuilder {
             escape(shipping.getCity()) + (shipping.getPostalCode() != null ? " " + escape(shipping.getPostalCode()) : "") + "<br>" +
             escape(shipping.getPhone());
 
-        String ctaUrl = (siteBaseUrl == null || siteBaseUrl.isBlank())
-            ? ""
-            : siteBaseUrl.trim().replaceAll("/+$", "") + "/orders/" + order.getOrderNumber();
+        String ctaUrl = buildOrderUrl(siteBaseUrl, order);
 
         return "<!doctype html><html dir=\"rtl\" lang=\"he\"><body style=\"margin:0;padding:0;background:#f6f6f6;font-family:Arial,sans-serif;color:#0f1014;direction:rtl;text-align:right\">"
             + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" dir=\"rtl\" style=\"background:#f6f6f6;padding:24px 0;direction:rtl\"><tr><td align=\"center\">"
@@ -111,9 +109,7 @@ public final class OrderEmailBuilder {
     }
 
     private static String statusEmail(String heading, String customerName, String body, Order order, String siteBaseUrl) {
-        String ctaUrl = (siteBaseUrl == null || siteBaseUrl.isBlank())
-            ? ""
-            : siteBaseUrl.trim().replaceAll("/+$", "") + "/orders/" + order.getOrderNumber();
+        String ctaUrl = buildOrderUrl(siteBaseUrl, order);
         return "<!doctype html><html dir=\"rtl\" lang=\"he\"><body style=\"margin:0;padding:0;background:#f6f6f6;font-family:Arial,sans-serif;color:#0f1014;direction:rtl;text-align:right\">"
             + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" dir=\"rtl\" style=\"background:#f6f6f6;padding:24px 0;direction:rtl\"><tr><td align=\"center\">"
             + "<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" dir=\"rtl\" style=\"max-width:600px;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;direction:rtl\">"
@@ -150,4 +146,18 @@ public final class OrderEmailBuilder {
     }
 
     private static String nullToEmpty(String s) { return s == null ? "" : s; }
+
+    /**
+     * Build the customer-facing order URL. Appends the guest token for
+     * orders without a linked user so the link survives across tabs /
+     * devices — sessionStorage alone would leave guests staring at
+     * "Unauthorized" if they re-open the link.
+     */
+    private static String buildOrderUrl(String siteBaseUrl, Order order) {
+        if (siteBaseUrl == null || siteBaseUrl.isBlank()) return "";
+        String base = siteBaseUrl.trim().replaceAll("/+$", "") + "/orders/" + order.getOrderNumber();
+        return order.getGuestToken() == null
+            ? base
+            : base + "?t=" + order.getGuestToken();
+    }
 }
