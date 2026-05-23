@@ -11,7 +11,7 @@ export function OrderConfirmationPage() {
   const [searchParams] = useSearchParams()
   const [order, setOrder] = useState<OrderView | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [needsLogin, setNeedsLogin] = useState(false)
+  const [needsLogin, setNeedsLogin] = useState<'unauth' | 'wrong-account' | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
   const { user } = useAuth()
   const nav = useNavigate()
@@ -23,14 +23,14 @@ export function OrderConfirmationPage() {
     // shared api() helper can attach the X-Guest-Token header.
     const urlToken = searchParams.get('t')
     if (urlToken) rememberGuestOrder(orderNumber, urlToken)
-    setError(null); setNeedsLogin(false)
+    setError(null); setNeedsLogin(null)
     api<OrderView>(`/api/orders/${orderNumber}`)
       .then(setOrder)
       .catch(e => {
-        // 401 = registered-account order opened without a session. Offer
-        // an inline login instead of a dead-end error.
         if (e instanceof ApiError && e.status === 401) {
-          setNeedsLogin(true)
+          setNeedsLogin('unauth')
+        } else if (e instanceof ApiError && e.status === 403) {
+          setNeedsLogin('wrong-account')
         } else {
           setError(e.message)
         }
@@ -38,12 +38,16 @@ export function OrderConfirmationPage() {
   }, [orderNumber, searchParams, reloadKey])
 
   if (needsLogin) {
+    const isMismatch = needsLogin === 'wrong-account'
     return (
       <>
         <div className="cls-page-narrow">
           <QuickLogin
-            message="ההזמנה משויכת לחשבון. התחברו כדי לצפות בפרטים ובחשבונית."
-            onSuccess={() => { setNeedsLogin(false); setReloadKey(k => k + 1) }}
+            heading={isMismatch ? 'ההזמנה משויכת לחשבון אחר' : undefined}
+            message={isMismatch
+              ? 'ההזמנה הזו לא משויכת לחשבון שאיתו אתם מחוברים. התחברו עם החשבון שביצע את ההזמנה.'
+              : 'ההזמנה משויכת לחשבון. התחברו כדי לצפות בפרטים ובחשבונית.'}
+            onSuccess={() => { setNeedsLogin(null); setReloadKey(k => k + 1) }}
           />
         </div>
         <Footer />

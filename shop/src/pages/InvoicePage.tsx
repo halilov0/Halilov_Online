@@ -10,19 +10,21 @@ export function InvoicePage() {
   const nav = useNavigate()
   const [order, setOrder] = useState<OrderView | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [needsLogin, setNeedsLogin] = useState(false)
+  const [needsLogin, setNeedsLogin] = useState<'unauth' | 'wrong-account' | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     if (!orderNumber) return
     const urlToken = searchParams.get('t')
     if (urlToken) rememberGuestOrder(orderNumber, urlToken)
-    setError(null); setNeedsLogin(false)
+    setError(null); setNeedsLogin(null)
     api<OrderView>(`/api/orders/${orderNumber}`)
       .then(setOrder)
       .catch(e => {
         if (e instanceof ApiError && e.status === 401) {
-          setNeedsLogin(true)
+          setNeedsLogin('unauth')
+        } else if (e instanceof ApiError && e.status === 403) {
+          setNeedsLogin('wrong-account')
         } else {
           setError(e.message)
         }
@@ -38,11 +40,15 @@ export function InvoicePage() {
   }, [order])
 
   if (needsLogin) {
+    const isMismatch = needsLogin === 'wrong-account'
     return (
       <div className="cls-page-narrow">
         <QuickLogin
-          message="ההזמנה משויכת לחשבון. התחברו כדי להוריד את החשבונית."
-          onSuccess={() => { setNeedsLogin(false); setReloadKey(k => k + 1) }}
+          heading={isMismatch ? 'החשבונית משויכת לחשבון אחר' : undefined}
+          message={isMismatch
+            ? 'ההזמנה הזו לא משויכת לחשבון שאיתו אתם מחוברים. התחברו עם החשבון שביצע את ההזמנה.'
+            : 'ההזמנה משויכת לחשבון. התחברו כדי להוריד את החשבונית.'}
+          onSuccess={() => { setNeedsLogin(null); setReloadKey(k => k + 1) }}
         />
       </div>
     )

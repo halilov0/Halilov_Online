@@ -189,7 +189,11 @@ public class OrderService {
         Order order = orders.findByOrderNumber(orderNumber)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "order not found"));
         if (!user.getId().equals(order.getUserId())) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "order not found");
+            // The order exists but belongs to someone else. 403 lets the SPA
+            // distinguish "wrong account" from "wrong order number" without
+            // leaking the owner's identity. Existence-leak is acceptable
+            // here — order numbers are scoped to this authenticated session.
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "order not on this account");
         }
         Address addr = order.getShippingAddressId() != null
             ? addresses.findById(order.getShippingAddressId()).orElse(null)
