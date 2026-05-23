@@ -21,8 +21,8 @@ public class OrderController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public OrderDtos.OrderView create(Authentication auth, @Valid @RequestBody OrderDtos.CreateOrderRequest req) {
-        requireAuth(auth);
-        return orderService.createOrder(auth.getName(), req);
+        String email = auth == null ? null : auth.getName();
+        return orderService.createOrder(email, req);
     }
 
     @GetMapping
@@ -32,9 +32,18 @@ public class OrderController {
     }
 
     @GetMapping("/{orderNumber}")
-    public OrderDtos.OrderView one(Authentication auth, @PathVariable String orderNumber) {
-        requireAuth(auth);
-        return orderService.getMine(auth.getName(), orderNumber);
+    public OrderDtos.OrderView one(
+        Authentication auth,
+        @PathVariable String orderNumber,
+        @RequestHeader(value = "X-Guest-Token", required = false) String guestToken
+    ) {
+        if (auth != null && auth.getName() != null) {
+            return orderService.getMine(auth.getName(), orderNumber);
+        }
+        if (guestToken == null || guestToken.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "login required");
+        }
+        return orderService.getByToken(orderNumber, guestToken);
     }
 
     @PostMapping("/{orderNumber}/cancel")

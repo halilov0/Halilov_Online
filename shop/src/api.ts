@@ -1,4 +1,5 @@
 const TOKEN_KEY = 'halilov.token'
+const GUEST_ORDERS_KEY = 'halilov.guestOrders'
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
@@ -7,6 +8,41 @@ export function getToken(): string | null {
 export function setToken(token: string | null) {
   if (token) localStorage.setItem(TOKEN_KEY, token)
   else localStorage.removeItem(TOKEN_KEY)
+}
+
+// Tokens issued at guest order creation, used to gate later anonymous
+// reads / payment calls. Stored in sessionStorage so they vanish when the
+// browser tab closes — long-lived persistence belongs to a real account.
+type GuestOrderMap = Record<string, string>
+
+function readGuestOrders(): GuestOrderMap {
+  try {
+    const raw = sessionStorage.getItem(GUEST_ORDERS_KEY)
+    return raw ? (JSON.parse(raw) as GuestOrderMap) : {}
+  } catch {
+    return {}
+  }
+}
+
+export function getGuestOrderToken(orderNumber: string): string | null {
+  return readGuestOrders()[orderNumber] ?? null
+}
+
+export function rememberGuestOrder(orderNumber: string, token: string) {
+  const map = readGuestOrders()
+  map[orderNumber] = token
+  sessionStorage.setItem(GUEST_ORDERS_KEY, JSON.stringify(map))
+}
+
+function guestTokenForPath(path: string): string | null {
+  // Match the orderNumber segment in /api/orders/{n}, /api/orders/{n}/pay,
+  // and /api/payments/mock/{n}/complete. Strip query string first.
+  const clean = path.split('?')[0]
+  const orderMatch = clean.match(/^\/api\/orders\/([^/]+)(?:\/pay)?$/)
+  if (orderMatch) return getGuestOrderToken(orderMatch[1])
+  const payMatch = clean.match(/^\/api\/payments\/mock\/([^/]+)\/complete$/)
+  if (payMatch) return getGuestOrderToken(payMatch[1])
+  return null
 }
 
 export class ApiError extends Error {
@@ -24,6 +60,10 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
   const token = getToken()
   if (token) headers.set('Authorization', `Bearer ${token}`)
+  if (!token && !headers.has('X-Guest-Token')) {
+    const guestToken = guestTokenForPath(path)
+    if (guestToken) headers.set('X-Guest-Token', guestToken)
+  }
 
   const res = await fetch(path, { ...init, headers })
   const text = await res.text()
@@ -155,6 +195,7 @@ export type CreateOrderRequest = {
   shipping: ShippingRequest
   deliveryMethod: DeliveryMethod
   couponCode?: string
+  guestEmail?: string
 }
 
 export type DeliveryOption = {
@@ -217,6 +258,8 @@ export type OrderView = {
   cancelledBy: 'CUSTOMER' | 'ADMIN' | 'SYSTEM' | null
   refundedAt: string | null
   refundAmountAgorot: number | null
+  guestEmail: string | null
+  guestToken: string | null
 }
 
 export function canCustomerCancel(status: OrderView['status']): boolean {

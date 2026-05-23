@@ -49,6 +49,12 @@ public class Order {
     @Column(name = "shipping_address_id")
     private Long shippingAddressId;
 
+    @Column(name = "guest_email")
+    private String guestEmail;
+
+    @Column(name = "guest_token")
+    private String guestToken;
+
     @Column(name = "payment_ref")
     private String paymentRef;
 
@@ -116,6 +122,10 @@ public class Order {
     public void setTotalAgorot(int totalAgorot) { this.totalAgorot = totalAgorot; }
     public Long getShippingAddressId() { return shippingAddressId; }
     public void setShippingAddressId(Long shippingAddressId) { this.shippingAddressId = shippingAddressId; }
+    public String getGuestEmail() { return guestEmail; }
+    public void setGuestEmail(String guestEmail) { this.guestEmail = guestEmail; }
+    public String getGuestToken() { return guestToken; }
+    public void setGuestToken(String guestToken) { this.guestToken = guestToken; }
     public String getPaymentRef() { return paymentRef; }
     public void setPaymentRef(String paymentRef) { this.paymentRef = paymentRef; }
     public String getInvoiceNumber() { return invoiceNumber; }

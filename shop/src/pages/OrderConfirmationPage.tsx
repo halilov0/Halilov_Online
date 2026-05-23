@@ -22,9 +22,10 @@ export function OrderConfirmationPage() {
   if (error) return <div className="cls-page"><div className="hm-error">{error}</div></div>
   if (!order) return <div className="cls-page"><p style={{ color: 'var(--ink-3)' }}>טוען…</p></div>
 
-  const greetingName = user?.fullName?.split(' ')[0] ?? ''
+  const greetingName = (user?.fullName ?? order.shipping?.fullName ?? '').split(' ')[0]
   const statusLower = order.status.toLowerCase()
   const isCancelled = order.status === 'CANCELLED'
+  const receiptEmail = user?.email ?? order.guestEmail ?? null
 
   return (
     <>
@@ -41,7 +42,7 @@ export function OrderConfirmationPage() {
             הזמנה <span className="mono" style={{ color: 'var(--ink)', fontWeight: 700 }}>#{order.orderNumber}</span>
             {isCancelled
               ? <> · החיוב לא בוצע. ניתן לחזור לקטלוג ולנסות שוב.</>
-              : (user && <> · נשלח אישור אל {user.email}</>)}
+              : (receiptEmail && <> · נשלח אישור אל {receiptEmail}</>)}
           </p>
         </div>
 

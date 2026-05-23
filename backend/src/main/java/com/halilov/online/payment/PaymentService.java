@@ -40,11 +40,12 @@ public class PaymentService {
 
     public PaymentDtos.InitiateResponse initiate(String email, String orderNumber) {
         Order order = loadOwnPendingOrder(email, orderNumber);
-        return new PaymentDtos.InitiateResponse(
-            provider,
-            buildRedirectUrl(order),
-            order.getOrderNumber()
-        );
+        return respond(order);
+    }
+
+    public PaymentDtos.InitiateResponse initiateGuest(String orderNumber, String token) {
+        Order order = loadGuestPendingOrder(orderNumber, token);
+        return respond(order);
     }
 
     public PaymentDtos.InitiateResponse completeMock(String email, String orderNumber, String outcome) {
@@ -52,7 +53,22 @@ public class PaymentService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "mock complete is disabled");
         }
         Order order = loadOwnPendingOrder(email, orderNumber);
+        return applyMockOutcome(order, outcome);
+    }
 
+    public PaymentDtos.InitiateResponse completeMockGuest(String orderNumber, String token, String outcome) {
+        if (!"mock".equals(provider)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "mock complete is disabled");
+        }
+        Order order = loadGuestPendingOrder(orderNumber, token);
+        return applyMockOutcome(order, outcome);
+    }
+
+    private PaymentDtos.InitiateResponse respond(Order order) {
+        return new PaymentDtos.InitiateResponse(provider, buildRedirectUrl(order), order.getOrderNumber());
+    }
+
+    private PaymentDtos.InitiateResponse applyMockOutcome(Order order, String outcome) {
         if ("success".equalsIgnoreCase(outcome)) {
             orderService.adminUpdateStatus(order.getOrderNumber(), OrderStatus.PAID);
         } else if ("cancel".equalsIgnoreCase(outcome)) {
@@ -71,10 +87,20 @@ public class PaymentService {
         if (!user.getId().equals(order.getUserId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "order not found");
         }
+        requirePending(order);
+        return order;
+    }
+
+    private Order loadGuestPendingOrder(String orderNumber, String token) {
+        Order order = orderService.loadByGuestToken(orderNumber, token);
+        requirePending(order);
+        return order;
+    }
+
+    private void requirePending(Order order) {
         if (order.getStatus() != OrderStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "order not in PENDING state");
         }
-        return order;
     }
 
     private String buildRedirectUrl(Order order) {

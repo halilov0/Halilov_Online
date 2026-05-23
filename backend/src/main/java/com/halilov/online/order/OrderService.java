@@ -18,7 +18,9 @@ import com.halilov.online.notification.OrderEmailBuilder;
 import com.halilov.online.user.User;
 import com.halilov.online.user.UserRepository;
 
+import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,8 +63,10 @@ public class OrderService {
 
     @Transactional
     public OrderDtos.OrderView createOrder(String email, OrderDtos.CreateOrderRequest req) {
-        User user = users.findByEmail(email)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no user"));
+        User user = email == null ? null : users.findByEmail(email).orElse(null);
+        if (email != null && user == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no user");
+        }
 
         DeliveryMethod method = DeliveryMethod.COURIER;
         OrderDtos.ShippingRequest ship = req.shipping();
@@ -73,6 +77,16 @@ public class OrderService {
                 "courier delivery requires shipping address");
         }
 
+        // Guests must supply a contact email — that's where the receipt goes.
+        String guestEmail = null;
+        if (user == null) {
+            guestEmail = req.guestEmail() == null ? null : req.guestEmail().trim();
+            if (guestEmail == null || guestEmail.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "guest checkout requires email");
+            }
+        }
+
         // Load all products for the items in one go
         List<Long> productIds = req.items().stream().map(OrderDtos.OrderItemRequest::productId).distinct().toList();
         Map<Long, Product> byId = new HashMap<>();
@@ -81,7 +95,7 @@ public class OrderService {
         Address addr = null;
         if (ship != null && ship.fullName() != null && !ship.fullName().isBlank()) {
             addr = new Address();
-            addr.setUserId(user.getId());
+            addr.setUserId(user == null ? null : user.getId());
             addr.setFullName(ship.fullName());
             addr.setPhone(ship.phone());
             addr.setStreet(nz(ship.street()));
@@ -94,10 +108,14 @@ public class OrderService {
         }
 
         Order order = new Order();
-        order.setUserId(user.getId());
+        order.setUserId(user == null ? null : user.getId());
         order.setStatus(OrderStatus.PENDING);
         order.setDeliveryMethod(method);
         if (addr != null) order.setShippingAddressId(addr.getId());
+        if (user == null) {
+            order.setGuestEmail(guestEmail);
+            order.setGuestToken(generateGuestToken());
+        }
 
         int subtotal = 0;
         for (OrderDtos.OrderItemRequest itemReq : req.items()) {
@@ -136,7 +154,32 @@ public class OrderService {
         order.setOrderNumber(generateOrderNumber());
 
         order = orders.save(order);
+        return OrderDtos.OrderView.from(order, addr, user == null);
+    }
+
+    /**
+     * Anonymous order lookup. The caller proves ownership by holding the
+     * random token returned at create time — order numbers alone are too
+     * predictable (millis + 4-digit rand) to gate access on.
+     */
+    @Transactional(readOnly = true)
+    public OrderDtos.OrderView getByToken(String orderNumber, String token) {
+        Order order = loadByGuestToken(orderNumber, token);
+        Address addr = order.getShippingAddressId() != null
+            ? addresses.findById(order.getShippingAddressId()).orElse(null)
+            : null;
         return OrderDtos.OrderView.from(order, addr);
+    }
+
+    /** Used by PaymentService to authorise guest payment calls. */
+    public Order loadByGuestToken(String orderNumber, String token) {
+        Order order = orders.findByOrderNumber(orderNumber)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "order not found"));
+        if (token == null || order.getGuestToken() == null
+            || !order.getGuestToken().equals(token)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "order not found");
+        }
+        return order;
     }
 
     @Transactional(readOnly = true)
@@ -367,19 +410,41 @@ public class OrderService {
             : null;
     }
 
+    /**
+     * Resolve who to email + display name. Falls back to the guest contact
+     * captured at checkout when the order has no linked user.
+     */
+    private BuyerContact resolveBuyer(Order order, Address addr) {
+        String email = null;
+        String fallbackName = null;
+        if (order.getUserId() != null) {
+            User buyer = users.findById(order.getUserId()).orElse(null);
+            if (buyer != null) {
+                email = buyer.getEmail();
+                fallbackName = buyer.getFullName();
+            }
+        } else if (order.getGuestEmail() != null) {
+            email = order.getGuestEmail();
+        }
+        if (email == null) return null;
+        String name = addr != null && addr.getFullName() != null && !addr.getFullName().isBlank()
+            ? addr.getFullName() : (fallbackName != null ? fallbackName : "לקוח/ה");
+        return new BuyerContact(email, name);
+    }
+
+    private record BuyerContact(String email, String name) {}
+
     private void sendCancelEmail(Order order, Address addr, boolean wasPaid) {
         try {
-            User buyer = users.findById(order.getUserId()).orElse(null);
+            BuyerContact buyer = resolveBuyer(order, addr);
             if (buyer == null) return;
-            String customerName = addr != null && addr.getFullName() != null && !addr.getFullName().isBlank()
-                ? addr.getFullName() : buyer.getFullName();
             List<String> bcc = new ArrayList<>();
             if (adminBcc != null && !adminBcc.isBlank()) bcc.add(adminBcc.trim());
             emailService.send(new EmailMessage(
-                buyer.getEmail(),
-                customerName,
+                buyer.email(),
+                buyer.name(),
                 OrderEmailBuilder.cancelSubject(order),
-                OrderEmailBuilder.cancelHtml(order, customerName, wasPaid, siteBaseUrl),
+                OrderEmailBuilder.cancelHtml(order, buyer.name(), wasPaid, siteBaseUrl),
                 bcc
             ));
         } catch (Exception e) {
@@ -389,17 +454,15 @@ public class OrderService {
 
     private void sendRefundEmail(Order order, Address addr, int amountAgorot) {
         try {
-            User buyer = users.findById(order.getUserId()).orElse(null);
+            BuyerContact buyer = resolveBuyer(order, addr);
             if (buyer == null) return;
-            String customerName = addr != null && addr.getFullName() != null && !addr.getFullName().isBlank()
-                ? addr.getFullName() : buyer.getFullName();
             List<String> bcc = new ArrayList<>();
             if (adminBcc != null && !adminBcc.isBlank()) bcc.add(adminBcc.trim());
             emailService.send(new EmailMessage(
-                buyer.getEmail(),
-                customerName,
+                buyer.email(),
+                buyer.name(),
                 OrderEmailBuilder.refundSubject(order),
-                OrderEmailBuilder.refundHtml(order, customerName, amountAgorot, siteBaseUrl),
+                OrderEmailBuilder.refundHtml(order, buyer.name(), amountAgorot, siteBaseUrl),
                 bcc
             ));
         } catch (Exception e) {
@@ -409,20 +472,18 @@ public class OrderService {
 
     private void sendOrderPaidEmail(Order order, Address addr) {
         try {
-            User buyer = users.findById(order.getUserId()).orElse(null);
+            BuyerContact buyer = resolveBuyer(order, addr);
             if (buyer == null) {
-                log.warn("order {} has no buyer user, skipping email", order.getOrderNumber());
+                log.warn("order {} has no buyer contact, skipping email", order.getOrderNumber());
                 return;
             }
-            String customerName = addr != null && addr.getFullName() != null && !addr.getFullName().isBlank()
-                ? addr.getFullName() : buyer.getFullName();
             List<String> bcc = new ArrayList<>();
             if (adminBcc != null && !adminBcc.isBlank()) bcc.add(adminBcc.trim());
             emailService.send(new EmailMessage(
-                buyer.getEmail(),
-                customerName,
+                buyer.email(),
+                buyer.name(),
                 OrderEmailBuilder.subject(order),
-                OrderEmailBuilder.html(order, addr, customerName, siteBaseUrl),
+                OrderEmailBuilder.html(order, addr, buyer.name(), siteBaseUrl),
                 bcc
             ));
         } catch (Exception e) {
@@ -434,5 +495,13 @@ public class OrderService {
         long ts = System.currentTimeMillis();
         int rand = ThreadLocalRandom.current().nextInt(1000, 9999);
         return "HO-" + ts + "-" + rand;
+    }
+
+    private static final SecureRandom GUEST_TOKEN_RNG = new SecureRandom();
+
+    private String generateGuestToken() {
+        byte[] buf = new byte[24];
+        GUEST_TOKEN_RNG.nextBytes(buf);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(buf);
     }
 }

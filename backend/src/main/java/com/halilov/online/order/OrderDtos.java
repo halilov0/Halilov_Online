@@ -28,7 +28,8 @@ public class OrderDtos {
         @NotEmpty @Size(max = 50) @Valid List<OrderItemRequest> items,
         @Valid ShippingRequest shipping,
         DeliveryMethod deliveryMethod,
-        @Size(max = 64) String couponCode
+        @Size(max = 64) String couponCode,
+        @Email @Size(max = 255) String guestEmail
     ) {}
 
     public record UpdateStatusRequest(@NotNull OrderStatus status) {}
@@ -74,9 +75,18 @@ public class OrderDtos {
         List<OrderItemView> items, ShippingView shipping, Instant createdAt,
         Instant cancelledAt, String cancellationReason, String cancelledBy,
         Instant refundedAt, Integer refundAmountAgorot,
-        DeliveryMethod deliveryMethod
+        DeliveryMethod deliveryMethod,
+        String guestEmail,
+        // Only set on the create-order response for guest checkouts — lets the
+        // SPA call the order/payment endpoints anonymously. Subsequent reads
+        // never include it.
+        String guestToken
     ) {
         static OrderView from(Order o, Address a) {
+            return from(o, a, false);
+        }
+
+        static OrderView from(Order o, Address a, boolean includeGuestToken) {
             return new OrderView(
                 o.getOrderNumber(), o.getStatus().name(),
                 o.getSubtotalAgorot(), o.getShippingAgorot(), o.getVatAgorot(),
@@ -86,7 +96,9 @@ public class OrderDtos {
                 ShippingView.from(a), o.getCreatedAt(),
                 o.getCancelledAt(), o.getCancellationReason(), o.getCancelledBy(),
                 o.getRefundedAt(), o.getRefundAmountAgorot(),
-                o.getDeliveryMethod()
+                o.getDeliveryMethod(),
+                o.getGuestEmail(),
+                includeGuestToken ? o.getGuestToken() : null
             );
         }
     }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, Fragment } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import {
-  api, formatPrice,
+  api, formatPrice, rememberGuestOrder,
   type CouponValidateResponse, type CreateOrderRequest,
   type DeliveryQuote, type OrderView, type SavedAddress,
 } from '../api'
@@ -21,8 +21,10 @@ const STEPS = [
 // Israeli mobile prefixes only — couriers need a phone they can reach in the field.
 const PHONE_PREFIXES = ['050', '051', '052', '053', '054', '055', '058'] as const
 
-type ErrorKey = 'fullName' | 'phone' | 'city' | 'street' | 'houseNo' | 'postalCode'
+type ErrorKey = 'fullName' | 'phone' | 'city' | 'street' | 'houseNo' | 'postalCode' | 'guestEmail'
 type Errors = Partial<Record<ErrorKey, string>>
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 // House number: digits, optionally followed by one Hebrew/Latin letter (e.g. "10א", "7B").
 const HOUSE_NO_RE = /^\d+[א-תa-zA-Z]?$/
@@ -49,6 +51,7 @@ export function CheckoutPage() {
   const [fullName, setFullName] = useState(user?.fullName ?? '')
   const [phonePrefix, setPhonePrefix] = useState<string>(seeded.prefix)
   const [phoneNumber, setPhoneNumber] = useState<string>(seeded.number)
+  const [guestEmail, setGuestEmail] = useState('')
   const [street, setStreet] = useState('')
   const [houseNo, setHouseNo] = useState('')
   const [apartment, setApartment] = useState('')
@@ -102,10 +105,6 @@ export function CheckoutPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
-  useEffect(() => {
-    if (!user) nav('/login?next=/checkout')
-  }, [user, nav])
-
   // Mount-only guard: bounce to /cart if user lands empty. AFTER mount we ignore
   // lines becoming 0 — otherwise clearing the cart on submit races with the
   // payment redirect and the SPA shows a white frame until refresh.
@@ -132,7 +131,7 @@ export function CheckoutPage() {
     return () => { cancelled = true }
   }, [city])
 
-  if (!user || (lines.length === 0 && !submitting)) return null
+  if (lines.length === 0 && !submitting) return null
 
   const subtotal = subtotalAgorot()
   const discount = coupon ? Math.min(coupon.discountAgorot, subtotal) : 0
@@ -193,6 +192,7 @@ export function CheckoutPage() {
     switch (name) {
       case 'fullName':   return v.length < 2 ? 'נדרש שם מלא' : null
       case 'phone':      return PHONE_NUMBER_RE.test(phoneNumber) ? null : 'מספר טלפון - 7 ספרות'
+      case 'guestEmail': return EMAIL_RE.test(v) ? null : 'נדרשת כתובת אימייל תקינה'
       case 'city': {
         if (!v) return 'נדרשת עיר'
         if (allCities.size > 0 && !allCities.has(v)) return 'בחרו עיר מהרשימה'
@@ -231,6 +231,7 @@ export function CheckoutPage() {
       street:     validate('street',     street)           ?? undefined,
       houseNo:    validate('houseNo',    houseNo)          ?? undefined,
       postalCode: validate('postalCode', postalCode)       ?? undefined,
+      guestEmail: user ? undefined : (validate('guestEmail', guestEmail) ?? undefined),
     }
   }
 
@@ -245,6 +246,7 @@ export function CheckoutPage() {
       setTouched({
         fullName: true, phone: true, city: true,
         street: true, houseNo: true, postalCode: true,
+        guestEmail: true,
       })
       setError('בדקו את השדות המסומנים באדום')
       return
@@ -267,11 +269,15 @@ export function CheckoutPage() {
         },
         deliveryMethod: 'COURIER',
         couponCode: coupon?.code,
+        guestEmail: user ? undefined : guestEmail.trim(),
       }
       const order = await api<OrderView>('/api/orders', {
         method: 'POST',
         body: JSON.stringify(body),
       })
+      if (!user && order.guestToken) {
+        rememberGuestOrder(order.orderNumber, order.guestToken)
+      }
       const pay = await api<{ provider: string; redirectUrl: string; orderNumber: string }>(
         `/api/orders/${order.orderNumber}/pay`,
         { method: 'POST' }
@@ -315,6 +321,31 @@ export function CheckoutPage() {
                   )
                 })}
               </div>
+
+              {!user && (
+                <>
+                  <div className="cls-checkout-section-title">פרטי קשר</div>
+                  <div className="cls-info-banner" style={{ marginBottom: 12 }}>
+                    <span className="ico"><Icon name="user" size={16} /></span>
+                    <div>
+                      קונים כאורח — אישור ההזמנה יישלח למייל למטה.{' '}
+                      <Link to="/login?next=/checkout" style={{ fontWeight: 700 }}>
+                        כבר יש לכם חשבון? התחברו
+                      </Link>
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 14 }}>
+                    <Field
+                      label="אימייל" required value={guestEmail}
+                      placeholder="name@example.com"
+                      inputMode="email"
+                      onChange={e => { setGuestEmail(e.target.value); patchOnChange('guestEmail', e.target.value) }}
+                      onBlur={() => markBlur('guestEmail', guestEmail)}
+                      error={errors.guestEmail}
+                    />
+                  </div>
+                </>
+              )}
 
               <div className="cls-checkout-section-title">פרטי משלוח</div>
 
