@@ -14,4 +14,6 @@ public class DeliveryDtos {
     ) {}
 
     public record Quote(List<Option> options) {}
+
+    public record Config(int courierFlatAgorot, int freeAboveAgorot) {}
 }

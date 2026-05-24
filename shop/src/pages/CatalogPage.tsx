@@ -7,6 +7,7 @@ import { Footer } from '../components/Footer'
 import { Icon } from '../components/Icon'
 import { comingSoon } from '../components/Toast'
 import { useCart } from '../cart/cartStore'
+import { useDeliveryConfig } from '../delivery/deliveryConfig'
 
 const DEPT_COLORS = [
   '#f4a261', '#2a9d8f', '#e76f51', '#264653',
@@ -88,6 +89,7 @@ function DeptTile({ c, idx, productCount }: { c: Category; idx: number; productC
 
 export function CatalogPage() {
   const [searchParams] = useSearchParams()
+  const freeAboveShekels = Math.round(useDeliveryConfig(s => s.freeAboveAgorot) / 100)
   const q = (searchParams.get('q') ?? '').trim()
   const urlCategoryId = searchParams.get('categoryId')
   const categoryId = urlCategoryId ? Number(urlCategoryId) : null
@@ -240,7 +242,7 @@ export function CatalogPage() {
               <div>
                 <div className="eyebrow">משלוחים</div>
                 <h3>שליח<br />עד הבית</h3>
-                <p className="lede">3-5 ימי עסקים. חינם בהזמנה מעל ₪300.</p>
+                <p className="lede">3-5 ימי עסקים. חינם בהזמנה מעל ₪{freeAboveShekels}.</p>
                 <Link to="/shipping" className="promo-cta">
                   קרא עוד
                   <Icon name="arrow" size={12} stroke={2.2} />
@@ -255,7 +257,7 @@ export function CatalogPage() {
 
         <div className="cls-trust">
           {([
-            ['truck', 'משלוח לכל הארץ', 'שליח עד הבית · חינם מעל ₪300.'],
+            ['truck', 'משלוח לכל הארץ', `שליח עד הבית · חינם מעל ₪${freeAboveShekels}.`],
             ['secure','תשלום מאובטח',   'Grow/Meshulam · PCI Compliant.'],
             ['pkg',   'החזרות חינם',     '14 יום להחזיר ללא שאלות.'],
             ['phone', 'שירות לקוחות',   'דברו איתנו · 054-6770020.'],

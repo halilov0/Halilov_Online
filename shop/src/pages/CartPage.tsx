@@ -1,22 +1,20 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../cart/cartStore'
 import { formatPrice } from '../api'
+import { useDeliveryConfig } from '../delivery/deliveryConfig'
 import { Icon } from '../components/Icon'
 import { Footer } from '../components/Footer'
 import { comingSoon } from '../components/Toast'
 
-// Mirrors backend `app.delivery.{freeAboveAgorot,courierFlatAgorot}` in DeliveryService.
-// Server is authoritative; this is the UI preview only.
-const FREE_SHIPPING_THRESHOLD = 30000 // ₪300
-const SHIPPING_AGOROT = 1990
-
 export function CartPage() {
   const { lines, setQty, remove, subtotalAgorot } = useCart()
+  const courierFlatAgorot = useDeliveryConfig(s => s.courierFlatAgorot)
+  const freeAboveAgorot = useDeliveryConfig(s => s.freeAboveAgorot)
   const nav = useNavigate()
   const subtotal = subtotalAgorot()
-  const shipping = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_AGOROT
+  const shipping = subtotal >= freeAboveAgorot ? 0 : courierFlatAgorot
   const total = subtotal + shipping
-  const toFree = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal)
+  const toFree = Math.max(0, freeAboveAgorot - subtotal)
   const totalItems = lines.reduce((s, l) => s + l.quantity, 0)
 
   if (lines.length === 0) {

@@ -18,6 +18,7 @@ import { FavoritesPage } from './pages/FavoritesPage'
 import { AccountPage } from './pages/AccountPage'
 import { useAuth } from './auth/authStore'
 import { useCart } from './cart/cartStore'
+import { useDeliveryConfig } from './delivery/deliveryConfig'
 import { getToken } from './api'
 
 function App() {
@@ -33,6 +34,9 @@ function App() {
         await useCart.getState().loadFromRemote()
       }
     })()
+    // Pull delivery config (shipping price + free-shipping threshold) so
+    // every surface reads from one server-backed source instead of literals.
+    void useDeliveryConfig.getState().load()
   }, [fetchMe])
 
   // Auth pages render their own split layout (no global header)

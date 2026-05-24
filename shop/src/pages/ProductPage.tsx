@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, type Product, type Category } from '../api'
 import { useCart } from '../cart/cartStore'
+import { useDeliveryConfig } from '../delivery/deliveryConfig'
 import { useFavorites } from '../favorites/favoritesStore'
 import { Icon } from '../components/Icon'
 import { Footer } from '../components/Footer'
@@ -87,6 +88,7 @@ function NotifyWhenInStock({
 
 export function ProductPage() {
   const { slug } = useParams<{ slug: string }>()
+  const freeAboveShekels = Math.round(useDeliveryConfig(s => s.freeAboveAgorot) / 100)
   const [product, setProduct] = useState<Product | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -203,7 +205,7 @@ export function ProductPage() {
                 ) : (
                   <span className="stock-pill in"><span className="dot" />במלאי · {product.stockQty} יח׳</span>
                 )}
-                <div className="ship-note">משלוח חינם מעל ₪300</div>
+                <div className="ship-note">משלוח חינם מעל ₪{freeAboveShekels}</div>
               </div>
             </div>
 
@@ -272,7 +274,7 @@ export function ProductPage() {
 
             <div className="cls-pdp-trust">
               {([
-                ['truck',  'משלוח חינם',   'מעל ₪300 · 3-5 ימי עסקים'],
+                ['truck',  'משלוח חינם',   `מעל ₪${freeAboveShekels} · 3-5 ימי עסקים`],
                 ['secure', 'תשלום מאובטח',  'Grow/Meshulam · PCI'],
                 ['pkg',    'החזרות 14 יום', 'בלי שאלות. בלי כאב ראש.'],
               ] as const).map(([i, t, s]) => (

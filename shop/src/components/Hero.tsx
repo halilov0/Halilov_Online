@@ -1,8 +1,13 @@
 import { Link } from 'react-router-dom'
 import { Icon } from './Icon'
 import { comingSoon } from './Toast'
+import { useDeliveryConfig } from '../delivery/deliveryConfig'
 
 export function Hero() {
+  const courierFlatAgorot = useDeliveryConfig(s => s.courierFlatAgorot)
+  const freeAboveAgorot = useDeliveryConfig(s => s.freeAboveAgorot)
+  const freeAboveShekels = Math.round(freeAboveAgorot / 100)
+  const courierShekels = (courierFlatAgorot / 100).toFixed(2)
   return (
     <section className="cls-hero">
       <div className="cls-hero-main">
@@ -50,9 +55,9 @@ export function Hero() {
 
       <div className="cls-hero-side">
         <div className="eyebrow">דיל היום</div>
-        <h3>משלוח חינם<br />מעל 300₪</h3>
+        <h3>משלוח חינם<br />מעל {freeAboveShekels}₪</h3>
         <div className="price-strike">
-          <span className="old">19.90₪</span>
+          <span className="old">{courierShekels}₪</span>
           <span className="now">חינם</span>
         </div>
         <div className="side-art">

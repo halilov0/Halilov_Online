@@ -46,4 +46,8 @@ public class DeliveryService {
             )
         ));
     }
+
+    public DeliveryDtos.Config config() {
+        return new DeliveryDtos.Config(courierFlatAgorot, freeAboveAgorot);
+    }
 }

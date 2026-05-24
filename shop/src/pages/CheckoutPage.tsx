@@ -7,6 +7,7 @@ import {
 } from '../api'
 import { useCart } from '../cart/cartStore'
 import { useAuth } from '../auth/authStore'
+import { useDeliveryConfig } from '../delivery/deliveryConfig'
 import { Field } from '../components/Field'
 import { Autocomplete, fetchCities, fetchStreets } from '../components/Autocomplete'
 import { Icon } from '../components/Icon'
@@ -45,6 +46,8 @@ function splitPhone(raw: string): { prefix: string; number: string } {
 export function CheckoutPage() {
   const { lines, subtotalAgorot, clearAll } = useCart()
   const { user } = useAuth()
+  const courierFlatAgorot = useDeliveryConfig(s => s.courierFlatAgorot)
+  const freeAboveAgorot = useDeliveryConfig(s => s.freeAboveAgorot)
   const nav = useNavigate()
 
   const seeded = splitPhone(user?.phone ?? '')
@@ -139,8 +142,8 @@ export function CheckoutPage() {
   const shippingAgorot = useMemo(() => {
     const opt = deliveryQuote?.options.find(o => o.method === 'COURIER')
     if (opt) return opt.priceAgorot
-    return discountedSubtotal >= 30000 ? 0 : 1990
-  }, [deliveryQuote, discountedSubtotal])
+    return discountedSubtotal >= freeAboveAgorot ? 0 : courierFlatAgorot
+  }, [deliveryQuote, discountedSubtotal, freeAboveAgorot, courierFlatAgorot])
   const total = discountedSubtotal + shippingAgorot
 
   useEffect(() => {
@@ -355,9 +358,9 @@ export function CheckoutPage() {
                   <div>
                     שליח עד הבית — {' '}
                     <strong>
-                      {shippingForCourier(deliveryQuote) === 0
+                      {shippingForCourier(deliveryQuote, courierFlatAgorot) === 0
                         ? 'חינם'
-                        : formatPrice(shippingForCourier(deliveryQuote))}
+                        : formatPrice(shippingForCourier(deliveryQuote, courierFlatAgorot))}
                     </strong>
                     {freeThresholdHint(deliveryQuote, discountedSubtotal)}
                   </div>
@@ -586,9 +589,9 @@ export function CheckoutPage() {
   )
 }
 
-function shippingForCourier(q: DeliveryQuote | null): number {
+function shippingForCourier(q: DeliveryQuote | null, fallbackAgorot: number): number {
   const opt = q?.options.find(o => o.method === 'COURIER')
-  return opt ? opt.priceAgorot : 1990
+  return opt ? opt.priceAgorot : fallbackAgorot
 }
 
 function freeThresholdHint(q: DeliveryQuote | null, subtotalAgorot: number): string {

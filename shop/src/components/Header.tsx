@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-do
 import { useAuth } from '../auth/authStore'
 import { useCart } from '../cart/cartStore'
 import { useFavorites } from '../favorites/favoritesStore'
+import { useDeliveryConfig } from '../delivery/deliveryConfig'
 import { api, type Category } from '../api'
 import { Icon } from './Icon'
 import { comingSoon } from './Toast'
@@ -12,6 +13,7 @@ export function Header() {
   const items = useCart(s => s.lines)
   const totalItems = items.reduce((s, l) => s + l.quantity, 0)
   const favCount = useFavorites(s => s.ids.length)
+  const freeAboveShekels = Math.round(useDeliveryConfig(s => s.freeAboveAgorot) / 100)
   const nav = useNavigate()
   const loc = useLocation()
   const [searchParams] = useSearchParams()
@@ -205,7 +207,7 @@ export function Header() {
           <div className="end">
             <span className="deal">
               <Icon name="bolt" size={14} />
-              משלוח חינם מ-300₪
+              משלוח חינם מ-{freeAboveShekels}₪
             </span>
           </div>
         </div>

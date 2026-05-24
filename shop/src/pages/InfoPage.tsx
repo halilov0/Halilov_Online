@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom'
 import { Footer } from '../components/Footer'
 import { whatsappUrl } from '../components/WhatsAppFab'
+import { useDeliveryConfig } from '../delivery/deliveryConfig'
 
 type Faq = { q: string; a: string }
 
 function AboutBody() {
+  const freeAboveShekels = Math.round(useDeliveryConfig(s => s.freeAboveAgorot) / 100)
   return (
     <>
       <p>
@@ -15,7 +17,7 @@ function AboutBody() {
       <h2>מה אנחנו עושים אחרת</h2>
       <ul>
         <li>מחירים שקופים, בלי הפתעות בקופה.</li>
-        <li>משלוח מהיר לכל הארץ — חינם מ-₪300.</li>
+        <li>משלוח מהיר לכל הארץ — חינם מ-₪{freeAboveShekels}.</li>
         <li>שירות לקוחות אנושי, בעברית, גם בערב.</li>
         <li>החזרות 14 יום בלי שאלות.</li>
       </ul>
@@ -33,6 +35,9 @@ function AboutBody() {
 }
 
 function ShippingBody() {
+  const courierFlatAgorot = useDeliveryConfig(s => s.courierFlatAgorot)
+  const freeAboveShekels = Math.round(useDeliveryConfig(s => s.freeAboveAgorot) / 100)
+  const courierPrice = `₪${(courierFlatAgorot / 100).toFixed(2)}`
   return (
     <>
       <p>
@@ -41,8 +46,8 @@ function ShippingBody() {
       </p>
       <h2>שיטת המשלוח</h2>
       <ul>
-        <li><strong>שליח עד הבית</strong> — 3-5 ימי עסקים, ₪19.90.</li>
-        <li><strong>משלוח חינם</strong> — בהזמנות מעל ₪300.</li>
+        <li><strong>שליח עד הבית</strong> — 3-5 ימי עסקים, {courierPrice}.</li>
+        <li><strong>משלוח חינם</strong> — בהזמנות מעל ₪{freeAboveShekels}.</li>
       </ul>
       <h2>מעקב הזמנה</h2>
       <p>
@@ -84,13 +89,14 @@ function ReturnsBody() {
 }
 
 function FaqBody() {
+  const freeAboveShekels = Math.round(useDeliveryConfig(s => s.freeAboveAgorot) / 100)
   const faqs: Faq[] = [
     { q: 'תוך כמה זמן מגיע המשלוח?', a: 'שליח עד הבית, 3-5 ימי עסקים מרגע אישור התשלום.' },
     { q: 'איך אני עוקב אחרי ההזמנה?', a: 'בדף מעקב הזמנה באתר, או דרך הקישור שנשלח אליכם במייל לאחר שליחת המשלוח.' },
     { q: 'אפשר להחזיר מוצר?', a: 'כן, תוך 14 יום מקבלת המוצר, באריזתו המקורית. ההחזר חוזר לאמצעי התשלום תוך 7 ימי עסקים.' },
     { q: 'איך מקבלים חשבונית מס?', a: 'חשבונית נשלחת אוטומטית למייל לאחר אישור התשלום. ניתן גם להוריד אותה מדף ההזמנה.' },
     { q: 'מה אמצעי התשלום?', a: 'כרטיסי אשראי (ויזה, מאסטרקארד, אמריקן אקספרס) דרך סליקה מאובטחת.' },
-    { q: 'יש משלוח חינם?', a: 'כן — בהזמנות מעל ₪300.' },
+    { q: 'יש משלוח חינם?', a: `כן — בהזמנות מעל ₪${freeAboveShekels}.` },
     { q: 'איך אני יוצר קשר?', a: 'בטלפון 054-6770020, בוואטסאפ דרך הכפתור הצף, או בדף צור קשר.' },
   ]
   return (

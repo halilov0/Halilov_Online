@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../auth/authStore'
+import { useDeliveryConfig } from '../delivery/deliveryConfig'
 import { Field } from '../components/Field'
 import { Icon } from '../components/Icon'
 import { comingSoon } from '../components/Toast'
@@ -8,6 +9,7 @@ import { comingSoon } from '../components/Toast'
 export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const freeAboveShekels = Math.round(useDeliveryConfig(s => s.freeAboveAgorot) / 100)
   const { login, loading, error } = useAuth()
   const nav = useNavigate()
   const [params] = useSearchParams()
@@ -75,7 +77,7 @@ export function LoginPage() {
           <div className="features">
             <div className="feat">
               <span className="ico"><Icon name="truck" size={14} /></span>
-              <span>משלוח חינם מעל ₪300 לכל הארץ.</span>
+              <span>משלוח חינם מעל ₪{freeAboveShekels} לכל הארץ.</span>
             </div>
             <div className="feat">
               <span className="ico"><Icon name="secure" size={14} /></span>

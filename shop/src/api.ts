@@ -211,6 +211,11 @@ export type DeliveryQuote = {
   options: DeliveryOption[]
 }
 
+export type DeliveryConfig = {
+  courierFlatAgorot: number
+  freeAboveAgorot: number
+}
+
 export type CouponType = 'PERCENT' | 'FIXED'
 
 export type CouponValidateResponse = {

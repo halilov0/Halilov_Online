@@ -19,4 +19,9 @@ public class DeliveryController {
     public DeliveryDtos.Quote quote(@RequestParam(name = "subtotalAgorot", defaultValue = "0") int subtotalAgorot) {
         return deliveryService.quote(Math.max(0, subtotalAgorot));
     }
+
+    @GetMapping("/config")
+    public DeliveryDtos.Config config() {
+        return deliveryService.config();
+    }
 }

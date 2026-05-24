@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/authStore'
+import { useDeliveryConfig } from '../delivery/deliveryConfig'
 import { Field } from '../components/Field'
 import { Icon } from '../components/Icon'
 
@@ -10,6 +11,7 @@ export function RegisterPage() {
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [marketingOptIn, setMarketingOptIn] = useState(false)
+  const freeAboveShekels = Math.round(useDeliveryConfig(s => s.freeAboveAgorot) / 100)
   const { register, loading, error } = useAuth()
   const nav = useNavigate()
 
@@ -85,7 +87,7 @@ export function RegisterPage() {
             </div>
             <div className="feat">
               <span className="ico"><Icon name="truck" size={14} /></span>
-              <span>משלוח לכל הארץ · חינם מעל ₪300.</span>
+              <span>משלוח לכל הארץ · חינם מעל ₪{freeAboveShekels}.</span>
             </div>
             <div className="feat">
               <span className="ico"><Icon name="phone" size={14} /></span>
