@@ -239,8 +239,8 @@ export function CatalogPage() {
             <div className="cls-promo-card dark">
               <div>
                 <div className="eyebrow">משלוחים</div>
-                <h3>מגיע למחרת<br />עד הדלת</h3>
-                <p className="lede">הזמנה עד 22:00 — אצלכם בבית כבר במחר.</p>
+                <h3>שליח<br />עד הבית</h3>
+                <p className="lede">3-5 ימי עסקים. חינם בהזמנה מעל ₪300.</p>
                 <Link to="/shipping" className="promo-cta">
                   קרא עוד
                   <Icon name="arrow" size={12} stroke={2.2} />
@@ -255,10 +255,10 @@ export function CatalogPage() {
 
         <div className="cls-trust">
           {([
-            ['truck', 'משלוח לכל הארץ', 'הזמנה עד 22:00, מגיע למחרת.'],
+            ['truck', 'משלוח לכל הארץ', 'שליח עד הבית · חינם מעל ₪300.'],
             ['secure','תשלום מאובטח',   'Grow/Meshulam · PCI Compliant.'],
             ['pkg',   'החזרות חינם',     '14 יום להחזיר ללא שאלות.'],
-            ['phone', 'שירות 24/7',     'אנחנו כאן בכל שעה — *6500.'],
+            ['phone', 'שירות לקוחות',   'דברו איתנו · 054-6770020.'],
           ] as const).map(([i, t, s]) => (
             <div key={i} className="cls-trust-item">
               <div className="ico">

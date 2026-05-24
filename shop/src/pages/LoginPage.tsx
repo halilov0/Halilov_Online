@@ -75,7 +75,7 @@ export function LoginPage() {
           <div className="features">
             <div className="feat">
               <span className="ico"><Icon name="truck" size={14} /></span>
-              <span>משלוח חינם מעל ₪199 לכל הארץ.</span>
+              <span>משלוח חינם מעל ₪300 לכל הארץ.</span>
             </div>
             <div className="feat">
               <span className="ico"><Icon name="secure" size={14} /></span>

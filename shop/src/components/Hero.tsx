@@ -38,8 +38,8 @@ export function Hero() {
               <div className="lbl">מחלקות</div>
             </div>
             <div className="stat">
-              <div className="num">24/7</div>
-              <div className="lbl">תמיכה</div>
+              <div className="num">14</div>
+              <div className="lbl">יום החזרה</div>
             </div>
           </div>
         </div>
@@ -50,9 +50,9 @@ export function Hero() {
 
       <div className="cls-hero-side">
         <div className="eyebrow">דיל היום</div>
-        <h3>משלוח חינם<br />מעל 199₪</h3>
+        <h3>משלוח חינם<br />מעל 300₪</h3>
         <div className="price-strike">
-          <span className="old">29₪</span>
+          <span className="old">19.90₪</span>
           <span className="now">חינם</span>
         </div>
         <div className="side-art">

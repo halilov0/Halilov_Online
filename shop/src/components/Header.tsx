@@ -46,15 +46,15 @@ export function Header() {
             משלוח לכל הארץ
           </span>
           <span className="sep" />
-          <Link to="/contact">שירות לקוחות 24/7</Link>
+          <Link to="/contact">שירות לקוחות</Link>
           <span className="sep" />
           <Link to="/track">מעקב הזמנה</Link>
           <span className="sep" />
           <a onClick={() => comingSoon('חנויות מורשות')}>חנויות מורשות</a>
           <div className="util-end">
-            <a onClick={() => comingSoon('שירות טלפוני')}>
+            <a href="tel:+972546770020">
               <Icon name="phone" size={12} />
-              *6500
+              054-6770020
             </a>
             <span className="sep" />
             <a onClick={() => comingSoon('English')}>EN</a>
@@ -205,7 +205,7 @@ export function Header() {
           <div className="end">
             <span className="deal">
               <Icon name="bolt" size={14} />
-              משלוח חינם מ-199₪
+              משלוח חינם מ-300₪
             </span>
           </div>
         </div>

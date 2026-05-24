@@ -203,7 +203,7 @@ export function ProductPage() {
                 ) : (
                   <span className="stock-pill in"><span className="dot" />במלאי · {product.stockQty} יח׳</span>
                 )}
-                <div className="ship-note">משלוח חינם מעל ₪199</div>
+                <div className="ship-note">משלוח חינם מעל ₪300</div>
               </div>
             </div>
 
@@ -272,7 +272,7 @@ export function ProductPage() {
 
             <div className="cls-pdp-trust">
               {([
-                ['truck',  'משלוח חינם',   'מעל ₪199 · עד 2 ימי עסקים'],
+                ['truck',  'משלוח חינם',   'מעל ₪300 · 3-5 ימי עסקים'],
                 ['secure', 'תשלום מאובטח',  'Grow/Meshulam · PCI'],
                 ['pkg',    'החזרות 14 יום', 'בלי שאלות. בלי כאב ראש.'],
               ] as const).map(([i, t, s]) => (

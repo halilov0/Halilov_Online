@@ -89,8 +89,6 @@ export function Footer() {
           <span className="pay-chip">VISA</span>
           <span className="pay-chip">MASTERCARD</span>
           <span className="pay-chip">AMEX</span>
-          <span className="pay-chip">PAYPAL</span>
-          <span className="pay-chip">BIT</span>
         </div>
       </div>
     </footer>

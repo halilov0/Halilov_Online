@@ -85,11 +85,11 @@ export function RegisterPage() {
             </div>
             <div className="feat">
               <span className="ico"><Icon name="truck" size={14} /></span>
-              <span>משלוח לכל הארץ עד 22:00.</span>
+              <span>משלוח לכל הארץ · חינם מעל ₪300.</span>
             </div>
             <div className="feat">
               <span className="ico"><Icon name="phone" size={14} /></span>
-              <span>שירות לקוחות 24/7 · *6500.</span>
+              <span>שירות לקוחות · 054-6770020.</span>
             </div>
           </div>
         </div>

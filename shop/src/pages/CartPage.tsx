@@ -5,7 +5,9 @@ import { Icon } from '../components/Icon'
 import { Footer } from '../components/Footer'
 import { comingSoon } from '../components/Toast'
 
-const FREE_SHIPPING_THRESHOLD = 19900 // ₪199
+// Mirrors backend `app.delivery.{freeAboveAgorot,courierFlatAgorot}` in DeliveryService.
+// Server is authoritative; this is the UI preview only.
+const FREE_SHIPPING_THRESHOLD = 30000 // ₪300
 const SHIPPING_AGOROT = 1990
 
 export function CartPage() {
@@ -50,7 +52,7 @@ export function CartPage() {
             <div className="cls-section-head" style={{ marginTop: 0 }}>
               <div className="title">
                 <h2>סל קניות</h2>
-                <span className="meta">{totalItems} פריטים · משלוח עד 2 ימי עסקים</span>
+                <span className="meta">{totalItems} פריטים · משלוח 3-5 ימי עסקים</span>
               </div>
             </div>
 
