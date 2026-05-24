@@ -137,9 +137,10 @@ export function InvoicePage() {
             </div>
           </div>
           <div className="biz">
-            <div>חלילוב אונליין בע"מ</div>
-            <div>ע.מ. / ח.פ. בתהליך רישום</div>
-            <div>support@halilov.market</div>
+            <div>חלילוב אונליין</div>
+            {/* TODO(business-number): replace with `עוסק פטור {number}` once רשות המסים registration completes. */}
+            <div>עוסק פטור</div>
+            <div>halilov.store@gmail.com</div>
           </div>
         </header>
 
@@ -208,7 +209,7 @@ export function InvoicePage() {
         <footer className="ftr">
           <div>תודה שקנית בחלילוב אונליין.</div>
           <div className="fine">
-            מסמך זה הופק אוטומטית ואינו דורש חתימה. בשאלות פנו ל-support@halilov.market.
+            מסמך זה הופק אוטומטית ואינו דורש חתימה. בשאלות פנו ל-halilov.store@gmail.com.
           </div>
         </footer>
       </article>
