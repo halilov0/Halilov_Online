@@ -13,6 +13,39 @@ function formatPriceParts(agorot: number) {
   return { shekels: s, agorot: a }
 }
 
+// Replace an existing <meta>/<link> if present, else create one. Returns a
+// cleanup that restores the previous content / removes the element we added,
+// so static tags in index.html survive client-side route changes.
+function upsertMeta(key: string, content: string, attr: 'name' | 'property' = 'name'): () => void {
+  const sel = `meta[${attr}="${CSS.escape(key)}"]`
+  const existing = document.head.querySelector<HTMLMetaElement>(sel)
+  if (existing) {
+    const prev = existing.getAttribute('content') ?? ''
+    existing.setAttribute('content', content)
+    return () => existing.setAttribute('content', prev)
+  }
+  const el = document.createElement('meta')
+  el.setAttribute(attr, key)
+  el.setAttribute('content', content)
+  document.head.appendChild(el)
+  return () => el.remove()
+}
+
+function upsertLink(rel: string, href: string): () => void {
+  const sel = `link[rel="${CSS.escape(rel)}"]`
+  const existing = document.head.querySelector<HTMLLinkElement>(sel)
+  if (existing) {
+    const prev = existing.getAttribute('href') ?? ''
+    existing.setAttribute('href', href)
+    return () => existing.setAttribute('href', prev)
+  }
+  const el = document.createElement('link')
+  el.setAttribute('rel', rel)
+  el.setAttribute('href', href)
+  document.head.appendChild(el)
+  return () => el.remove()
+}
+
 function NotifyWhenInStock({
   productId, isFav, onToggleFav,
 }: { productId: number; isFav: boolean; onToggleFav: () => void }) {
@@ -116,6 +149,55 @@ export function ProductPage() {
   useEffect(() => {
     api<Category[]>('/api/categories').then(setCategories).catch(() => {})
   }, [])
+
+  // Per-page SEO: <title>, meta description, canonical, and Product JSON-LD.
+  // SPA, so we mutate <head> on mount and restore on unmount.
+  useEffect(() => {
+    if (!product) return
+    const prevTitle = document.title
+    document.title = `${product.nameHe} · חלילוב אונליין`
+
+    const desc = (product.descriptionHe ?? `${product.nameHe} בחלילוב אונליין`).slice(0, 160)
+    const cleanups: Array<() => void> = [
+      upsertMeta('description', desc),
+      upsertMeta('og:title', `${product.nameHe} · חלילוב אונליין`, 'property'),
+      upsertMeta('og:description', desc, 'property'),
+      upsertMeta('og:type', 'product', 'property'),
+      upsertLink('canonical', `https://halilov.co.il/p/${product.slug}`),
+    ]
+    if (product.imageUrl) {
+      cleanups.push(upsertMeta('og:image', product.imageUrl, 'property'))
+    }
+
+    const ld = document.createElement('script')
+    ld.type = 'application/ld+json'
+    ld.dataset.productLd = '1'
+    ld.text = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: product.nameHe,
+      description: product.descriptionHe ?? undefined,
+      sku: product.sku,
+      image: [product.imageUrl, ...(product.imageUrls ?? [])].filter(Boolean),
+      url: `https://halilov.co.il/p/${product.slug}`,
+      offers: {
+        '@type': 'Offer',
+        priceCurrency: 'ILS',
+        price: (product.priceAgorot / 100).toFixed(2),
+        availability: product.stockQty > 0
+          ? 'https://schema.org/InStock'
+          : 'https://schema.org/OutOfStock',
+        url: `https://halilov.co.il/p/${product.slug}`,
+      },
+    })
+    document.head.appendChild(ld)
+
+    return () => {
+      document.title = prevTitle
+      cleanups.forEach(fn => fn())
+      ld.remove()
+    }
+  }, [product])
 
   if (error) return <div className="cls-page"><div className="hm-error">{error}</div></div>
   if (!product) return <div className="cls-page"><p style={{ color: 'var(--ink-3)' }}>טוען…</p></div>

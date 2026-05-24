@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+Disallow: /cart
+Disallow: /checkout
+Disallow: /payment/
+Disallow: /orders/
+Disallow: /invoice/
+Disallow: /track
+Disallow: /account
+Disallow: /favorites
+Disallow: /login
+Disallow: /register
+Disallow: /api/
+
+Sitemap: https://halilov.co.il/sitemap.xml

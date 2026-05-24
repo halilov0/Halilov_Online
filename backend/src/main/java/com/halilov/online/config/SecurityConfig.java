@@ -32,7 +32,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/ping", "/actuator/health", "/error").permitAll()
+                .requestMatchers("/api/ping", "/actuator/health", "/error", "/sitemap.xml").permitAll()
                 .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/media/**", "/api/places/**", "/api/delivery/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/products/*/stock-notify").permitAll()
