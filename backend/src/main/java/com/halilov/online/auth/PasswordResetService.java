@@ -137,14 +137,17 @@ public class PasswordResetService {
             log.warn("password reset email send failed for {}: {}", u.getEmail(), e.toString());
         }
 
-        audit.recordAs(triggeredByAdmin ? null : u.getId(),
-            u.getEmail(),
-            triggeredByAdmin ? null : u.getRole().name(),
-            AuditAction.PASSWORD_RESET_REQUESTED, "user", u.getId(),
-            triggeredByAdmin
-                ? "מנהל יזם איפוס סיסמה: " + u.getEmail()
-                : "משתמש ביקש איפוס סיסמה: " + u.getEmail(),
-            null);
+        if (triggeredByAdmin) {
+            // record() pulls actor from SecurityContext — that's the admin,
+            // which is what we want here. recordAs(target...) would clobber
+            // the admin's identity with the target user's email.
+            audit.record(AuditAction.PASSWORD_RESET_REQUESTED, "user", u.getId(),
+                "מנהל יזם איפוס סיסמה ל-" + u.getEmail());
+        } else {
+            audit.recordAs(u.getId(), u.getEmail(), u.getRole().name(),
+                AuditAction.PASSWORD_RESET_REQUESTED, "user", u.getId(),
+                "משתמש ביקש איפוס סיסמה: " + u.getEmail(), null);
+        }
     }
 
     private PasswordResetToken loadRedeemable(String token) {
