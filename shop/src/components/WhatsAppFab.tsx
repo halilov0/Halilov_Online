@@ -1,5 +1,5 @@
 const WHATSAPP_NUMBER = '972546770020'
-const WHATSAPP_GREETING = 'שלום, אשמח לעזרה לגבי הזמנה בחלילוב אונליין'
+const WHATSAPP_GREETING = 'היי, אני פונה בקשר לאתר חלילוב אונליין. אשמח לעזרה!'
 
 export const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_GREETING)}`
 
