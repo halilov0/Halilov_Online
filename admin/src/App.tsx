@@ -10,6 +10,8 @@ import { CouponsPage } from './pages/CouponsPage'
 import { OrdersPage } from './pages/OrdersPage'
 import { OrderDetailPage } from './pages/OrderDetailPage'
 import { MarketingPage } from './pages/MarketingPage'
+import { UsersPage } from './pages/UsersPage'
+import { AuditLogPage } from './pages/AuditLogPage'
 
 function App() {
   return (
@@ -24,6 +26,8 @@ function App() {
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/orders/:orderNumber" element={<OrderDetailPage />} />
           <Route path="/marketing" element={<MarketingPage />} />
+          <Route path="/users" element={<UsersPage />} />
+          <Route path="/audit-log" element={<AuditLogPage />} />
         </Route>
         <Route path="*" element={<div style={{ padding: '2rem' }}>404</div>} />
       </Routes>

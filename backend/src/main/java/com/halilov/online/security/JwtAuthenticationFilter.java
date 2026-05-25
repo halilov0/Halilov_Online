@@ -1,5 +1,7 @@
 package com.halilov.online.security;
 
+import com.halilov.online.user.User;
+import com.halilov.online.user.UserRepository;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -19,9 +21,11 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final UserRepository users;
 
-    public JwtAuthenticationFilter(JwtService jwtService) {
+    public JwtAuthenticationFilter(JwtService jwtService, UserRepository users) {
         this.jwtService = jwtService;
+        this.users = users;
     }
 
     @Override
@@ -37,15 +41,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String role = claims.get("role", String.class);
 
                 if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
-                    var auth = new UsernamePasswordAuthenticationToken(email, null, authorities);
-                    auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(auth);
+                    // Re-check the user against DB so an admin disable / force-logout
+                    // takes effect within one request, not when the JWT eventually
+                    // expires. One extra row read per authenticated request — fine
+                    // on the current low-traffic VM.
+                    User u = users.findByEmail(email).orElse(null);
+                    if (u != null && u.isEnabled() && tokenStillValid(claims, u)) {
+                        var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
+                        var auth = new UsernamePasswordAuthenticationToken(email, null, authorities);
+                        auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(auth);
+                    }
                 }
             } catch (Exception ignored) {
                 // invalid token -> stay anonymous
             }
         }
         chain.doFilter(request, response);
+    }
+
+    private static boolean tokenStillValid(Claims claims, User u) {
+        if (u.getForceLogoutAt() == null) return true;
+        java.util.Date iat = claims.getIssuedAt();
+        if (iat == null) return false;
+        return iat.toInstant().isAfter(u.getForceLogoutAt())
+            || iat.toInstant().equals(u.getForceLogoutAt());
     }
 }

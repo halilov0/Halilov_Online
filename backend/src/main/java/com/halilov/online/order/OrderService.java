@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.halilov.online.audit.AuditAction;
+import com.halilov.online.audit.AuditService;
 import com.halilov.online.catalog.Product;
 import com.halilov.online.catalog.ProductRepository;
 import com.halilov.online.common.Csv;
@@ -40,6 +42,7 @@ public class OrderService {
     private final CouponService couponService;
     private final DeliveryService deliveryService;
     private final EmailService emailService;
+    private final AuditService audit;
     private final String adminBcc;
     private final String siteBaseUrl;
 
@@ -48,6 +51,7 @@ public class OrderService {
                         CouponService couponService,
                         DeliveryService deliveryService,
                         EmailService emailService,
+                        AuditService audit,
                         @Value("${app.email.adminBcc:}") String adminBcc,
                         @Value("${app.email.siteBaseUrl:}") String siteBaseUrl) {
         this.orders = orders;
@@ -57,6 +61,7 @@ public class OrderService {
         this.couponService = couponService;
         this.deliveryService = deliveryService;
         this.emailService = emailService;
+        this.audit = audit;
         this.adminBcc = adminBcc;
         this.siteBaseUrl = siteBaseUrl;
     }
@@ -154,6 +159,15 @@ public class OrderService {
         order.setOrderNumber(generateOrderNumber());
 
         order = orders.save(order);
+        if (user != null) {
+            audit.recordAs(user.getId(), user.getEmail(), user.getRole().name(),
+                AuditAction.ORDER_PLACED, "order", order.getOrderNumber(),
+                "הזמנה נוצרה: " + order.getOrderNumber() + " (" + order.getTotalAgorot() + " אגורות)", null);
+        } else {
+            audit.recordAs(null, guestEmail, "GUEST",
+                AuditAction.ORDER_PLACED, "order", order.getOrderNumber(),
+                "הזמנת אורח: " + order.getOrderNumber() + " (" + order.getTotalAgorot() + " אגורות)", null);
+        }
         return OrderDtos.OrderView.from(order, addr, user == null);
     }
 
@@ -328,6 +342,8 @@ public class OrderService {
         }
 
         order.setStatus(newStatus);
+        audit.record(AuditAction.ORDER_STATUS_CHANGED, "order", order.getOrderNumber(),
+            "סטטוס הזמנה השתנה: " + order.getOrderNumber() + " " + old.name() + " → " + newStatus.name());
         Address addr = order.getShippingAddressId() != null
             ? addresses.findById(order.getShippingAddressId()).orElse(null) : null;
 
@@ -368,6 +384,9 @@ public class OrderService {
         applyCancel(order, "CUSTOMER", reason, wasPaid);
         Address addr = addressOf(order);
         sendCancelEmail(order, addr, wasPaid);
+        audit.recordAs(user.getId(), user.getEmail(), user.getRole().name(),
+            AuditAction.ORDER_CANCELLED, "order", order.getOrderNumber(),
+            "לקוח ביטל הזמנה: " + order.getOrderNumber(), null);
         return OrderDtos.OrderView.from(order, addr);
     }
 
@@ -408,6 +427,8 @@ public class OrderService {
         }
         Address addr = addressOf(order);
         sendRefundEmail(order, addr, amountAgorot);
+        audit.record(AuditAction.ORDER_REFUNDED, "order", order.getOrderNumber(),
+            "זיכוי הוצא: " + order.getOrderNumber() + " (" + amountAgorot + " אגורות)");
         return OrderDtos.OrderView.from(order, addr);
     }
 

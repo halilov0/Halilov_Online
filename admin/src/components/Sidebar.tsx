@@ -15,10 +15,11 @@ const OPS_ITEMS: Item[] = [
 
 const GROWTH_ITEMS: Item[] = [
   { to: '/marketing', label: 'שיווק', icon: 'megaphone' },
+  { to: '/users', label: 'לקוחות', icon: 'users' },
+  { to: '/audit-log', label: 'לוג פעולות', icon: 'history' },
 ]
 
 const GROWTH_LABELS: { label: string; icon: IconName }[] = [
-  { label: 'לקוחות', icon: 'users' },
   { label: 'דו"חות', icon: 'chart' },
   { label: 'הגדרות', icon: 'cog' },
 ]

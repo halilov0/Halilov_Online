@@ -45,6 +45,9 @@ public class User {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
 
+    @Column(name = "force_logout_at")
+    private Instant forceLogoutAt;
+
     @PreUpdate
     void onUpdate() { this.updatedAt = Instant.now(); }
 
@@ -69,4 +72,6 @@ public class User {
     public void setUnsubscribeToken(String unsubscribeToken) { this.unsubscribeToken = unsubscribeToken; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+    public Instant getForceLogoutAt() { return forceLogoutAt; }
+    public void setForceLogoutAt(Instant forceLogoutAt) { this.forceLogoutAt = forceLogoutAt; }
 }

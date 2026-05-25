@@ -28,7 +28,10 @@ public class JwtService {
     }
 
     public String issue(User user) {
-        Instant now = Instant.now();
+        // Round down to whole seconds because JWT `iat` is unix-seconds
+        // precision — keeping millis would let a force_logout_at written in
+        // the same second slip through the > comparison in the auth filter.
+        Instant now = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
         Instant exp = now.plusSeconds(expirationMinutes * 60);
         return Jwts.builder()
             .subject(user.getEmail())

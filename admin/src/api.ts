@@ -150,6 +150,36 @@ export const ORDER_STATUSES: OrderStatus[] = [
   'PENDING', 'PAID', 'FULFILLED', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED'
 ]
 
+export type AdminUserRow = {
+  id: number
+  email: string
+  fullName: string
+  phone: string | null
+  role: Role
+  enabled: boolean
+  marketingOptIn: boolean
+  createdAt: string
+  forceLogoutAt: string | null
+  orderCount: number
+  spendAgorot: number
+}
+export type AdminUserList = { content: AdminUserRow[]; total: number; page: number; size: number }
+
+export type AuditLogRow = {
+  id: number
+  actorUserId: number | null
+  actorEmail: string | null
+  actorRole: string | null
+  actorIp: string | null
+  action: string
+  targetType: string | null
+  targetId: string | null
+  message: string | null
+  metadata: string | null
+  createdAt: string
+}
+export type AuditLogList = { content: AuditLogRow[]; total: number; page: number; size: number }
+
 export type DashboardMetrics = {
   kpi: {
     revenueTodayAgorot: number

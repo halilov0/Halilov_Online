@@ -5,6 +5,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.halilov.online.audit.AuditAction;
+import com.halilov.online.audit.AuditService;
 import com.halilov.online.security.JwtService;
 import com.halilov.online.user.Role;
 import com.halilov.online.user.User;
@@ -21,13 +23,16 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final AuditService audit;
 
     public AuthService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtService jwtService) {
+                       JwtService jwtService,
+                       AuditService audit) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.audit = audit;
     }
 
     @Transactional
@@ -49,19 +54,31 @@ public class AuthService {
             user.setUnsubscribeToken(UUID.randomUUID().toString().replace("-", ""));
         }
         userRepository.save(user);
+        audit.recordAs(user.getId(), user.getEmail(), user.getRole().name(),
+            AuditAction.USER_REGISTER, "user", user.getId(),
+            "משתמש נרשם: " + user.getEmail(), null);
         return toToken(user);
     }
 
     public AuthDtos.TokenResponse login(AuthDtos.LoginRequest req) {
         String email = req.email().toLowerCase().trim();
-        User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "bad credentials"));
-        if (!user.isEnabled()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "account disabled");
-        }
-        if (!passwordEncoder.matches(req.password(), user.getPasswordHash())) {
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user == null || !passwordEncoder.matches(req.password(), user.getPasswordHash())) {
+            audit.recordAs(user == null ? null : user.getId(), email,
+                user == null ? null : user.getRole().name(),
+                AuditAction.USER_LOGIN_FAILED, "user", user == null ? null : user.getId(),
+                "ניסיון התחברות נכשל: " + email, null);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "bad credentials");
         }
+        if (!user.isEnabled()) {
+            audit.recordAs(user.getId(), user.getEmail(), user.getRole().name(),
+                AuditAction.USER_LOGIN_FAILED, "user", user.getId(),
+                "ניסיון התחברות לחשבון מושבת: " + email, null);
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "account disabled");
+        }
+        audit.recordAs(user.getId(), user.getEmail(), user.getRole().name(),
+            AuditAction.USER_LOGIN, "user", user.getId(),
+            "התחברות: " + user.getEmail(), null);
         return toToken(user);
     }
 

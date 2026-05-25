@@ -8,6 +8,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.halilov.online.audit.AuditAction;
+import com.halilov.online.audit.AuditService;
+
 import java.io.IOException;
 import java.time.LocalDate;
 
@@ -16,43 +19,55 @@ import java.time.LocalDate;
 public class CatalogAdminController {
 
     private final CatalogService catalog;
+    private final AuditService audit;
 
-    public CatalogAdminController(CatalogService catalog) {
+    public CatalogAdminController(CatalogService catalog, AuditService audit) {
         this.catalog = catalog;
+        this.audit = audit;
     }
 
     @PostMapping("/categories")
     @ResponseStatus(HttpStatus.CREATED)
     public CatalogDtos.CategoryView createCategory(@Valid @RequestBody CatalogDtos.CategoryUpsert req) {
-        return catalog.createCategory(req);
+        CatalogDtos.CategoryView c = catalog.createCategory(req);
+        audit.record(AuditAction.CATEGORY_CREATED, "category", c.id(), "קטגוריה נוצרה: " + c.nameHe());
+        return c;
     }
 
     @PutMapping("/categories/{id}")
     public CatalogDtos.CategoryView updateCategory(@PathVariable Long id, @Valid @RequestBody CatalogDtos.CategoryUpsert req) {
-        return catalog.updateCategory(id, req);
+        CatalogDtos.CategoryView c = catalog.updateCategory(id, req);
+        audit.record(AuditAction.CATEGORY_UPDATED, "category", id, "קטגוריה עודכנה: " + c.nameHe());
+        return c;
     }
 
     @DeleteMapping("/categories/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteCategory(@PathVariable Long id) {
         catalog.deleteCategory(id);
+        audit.record(AuditAction.CATEGORY_DELETED, "category", id, "קטגוריה נמחקה (#" + id + ")");
     }
 
     @PostMapping("/products")
     @ResponseStatus(HttpStatus.CREATED)
     public CatalogDtos.ProductView createProduct(@Valid @RequestBody CatalogDtos.ProductUpsert req) {
-        return catalog.createProduct(req);
+        CatalogDtos.ProductView p = catalog.createProduct(req);
+        audit.record(AuditAction.PRODUCT_CREATED, "product", p.id(), "מוצר חדש: " + p.nameHe() + " (" + p.sku() + ")");
+        return p;
     }
 
     @PutMapping("/products/{id}")
     public CatalogDtos.ProductView updateProduct(@PathVariable Long id, @Valid @RequestBody CatalogDtos.ProductUpsert req) {
-        return catalog.updateProduct(id, req);
+        CatalogDtos.ProductView p = catalog.updateProduct(id, req);
+        audit.record(AuditAction.PRODUCT_UPDATED, "product", id, "מוצר עודכן: " + p.nameHe() + " (" + p.sku() + ")");
+        return p;
     }
 
     @DeleteMapping("/products/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteProduct(@PathVariable Long id) {
         catalog.deleteProduct(id);
+        audit.record(AuditAction.PRODUCT_DELETED, "product", id, "מוצר נמחק (#" + id + ")");
     }
 
     @GetMapping(value = "/products.csv", produces = "text/csv; charset=UTF-8")

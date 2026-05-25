@@ -5,6 +5,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.halilov.online.audit.AuditAction;
+import com.halilov.online.audit.AuditService;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -14,10 +17,12 @@ public class AccountService {
 
     private final UserRepository users;
     private final SavedAddressRepository addresses;
+    private final AuditService audit;
 
-    public AccountService(UserRepository users, SavedAddressRepository addresses) {
+    public AccountService(UserRepository users, SavedAddressRepository addresses, AuditService audit) {
         this.users = users;
         this.addresses = addresses;
+        this.audit = audit;
     }
 
     @Transactional
@@ -26,6 +31,8 @@ public class AccountService {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no session"));
         u.setFullName(req.fullName().trim());
         u.setPhone(req.phone() == null || req.phone().isBlank() ? null : req.phone().trim());
+        audit.record(AuditAction.ACCOUNT_PROFILE_UPDATED, "user", u.getId(),
+            "פרופיל עודכן: " + u.getEmail());
     }
 
     @Transactional
@@ -39,6 +46,8 @@ public class AccountService {
                 u.setUnsubscribeToken(UUID.randomUUID().toString().replace("-", ""));
             }
         }
+        audit.record(AuditAction.ACCOUNT_MARKETING_CHANGED, "user", u.getId(),
+            "הסכמה לשיווק: " + (optIn ? "אופטין" : "אופטאאוט"));
     }
 
     @Transactional(readOnly = true)
@@ -62,6 +71,8 @@ public class AccountService {
             clearDefault(u.getId());
         }
         SavedAddress saved = addresses.save(a);
+        audit.record(AuditAction.ACCOUNT_ADDRESS_SAVED, "address", saved.getId(),
+            "כתובת נשמרה: " + saved.getCity() + ", " + saved.getStreet());
         return AccountDtos.AddressView.from(saved);
     }
 
@@ -90,6 +101,7 @@ public class AccountService {
             addresses.findByUserIdOrderByIsDefaultDescCreatedAtDesc(u.getId()).stream()
                 .findFirst().ifPresent(next -> next.setDefault(true));
         }
+        audit.record(AuditAction.ACCOUNT_ADDRESS_DELETED, "address", id, "כתובת נמחקה (#" + id + ")");
     }
 
     @Transactional
