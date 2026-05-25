@@ -138,6 +138,12 @@ input, textarea, select { font-family: inherit; }
   font-weight: 900; font-size: 21px; letter-spacing: -0.025em;
   color: var(--ink);
 }
+.cls-header .cls-logo img {
+  display: block;
+  height: 52px;
+  width: auto;
+  max-width: 100%;
+}
 .cls-logo .mark {
   width: 38px; height: 38px;
   background: var(--ink);
@@ -311,6 +317,14 @@ input, textarea, select { font-family: inherit; }
 .cls-footer .col a:hover { color: #fff; }
 .cls-footer .brand-col .cls-logo { color: #fff; }
 .cls-footer .brand-col .cls-logo .sub { color: #97999f; }
+.cls-footer .brand-col .cls-logo img {
+  display: block;
+  height: 64px;
+  width: auto;
+  background: #fff;
+  padding: 8px 14px;
+  border-radius: var(--r-md);
+}
 .cls-footer .brand-col p { font-size: 13px; color: #97999f; margin-top: 16px; max-width: 32ch; line-height: 1.5; }
 .cls-footer .brand-col .socials {
   margin-top: 18px;
@@ -2312,6 +2326,7 @@ select.hm-input { appearance: none; background-image: linear-gradient(45deg, tra
   .cls-logo .sub { display: none; }
   .cls-logo { font-size: 17px; }
   .cls-logo .mark { width: 34px; height: 34px; font-size: 16px; }
+  .cls-header .cls-logo img { height: 40px; }
 
   /* search drops to its own row below header on phones */
   .cls-search {

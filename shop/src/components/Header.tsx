@@ -68,12 +68,8 @@ export function Header() {
 
       <header className={`cls-header${open ? ' open' : ''}`}>
         <div className="cls-header-inner">
-          <Link to="/" className="cls-logo" onClick={close}>
-            <span className="mark">ח</span>
-            <span>
-              חלילוב אונליין
-              <span className="sub">כל מה שצריך · במקום אחד</span>
-            </span>
+          <Link to="/" className="cls-logo" onClick={close} aria-label="חלילוב אונליין · דף הבית">
+            <img src="/logo.png" alt="חלילוב אונליין" width={600} height={331} />
           </Link>
 
           <form className="cls-search" onSubmit={submitSearch}>
