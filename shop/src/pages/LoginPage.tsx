@@ -4,7 +4,6 @@ import { useAuth } from '../auth/authStore'
 import { useDeliveryConfig } from '../delivery/deliveryConfig'
 import { Field } from '../components/Field'
 import { Icon } from '../components/Icon'
-import { comingSoon } from '../components/Toast'
 
 export function LoginPage() {
   const [email, setEmail] = useState('')
@@ -54,7 +53,7 @@ export function LoginPage() {
               value={password}
               onChange={e => setPassword(e.target.value)}
             />
-            <a className="forgot" onClick={() => comingSoon('שחזור סיסמה')}>שכחתי סיסמה</a>
+            <Link to="/forgot-password" className="forgot">שכחתי סיסמה</Link>
           </div>
           {error && <div className="hm-error">{error}</div>}
           <button type="submit" className="submit-cta" disabled={loading}>

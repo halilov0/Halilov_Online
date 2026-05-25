@@ -7,6 +7,8 @@ import { CatalogPage } from './pages/CatalogPage'
 import { ProductPage } from './pages/ProductPage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
+import { PasswordResetPage } from './pages/PasswordResetPage'
 import { CartPage } from './pages/CartPage'
 import { CheckoutPage } from './pages/CheckoutPage'
 import { OrderConfirmationPage } from './pages/OrderConfirmationPage'
@@ -43,6 +45,8 @@ function App() {
   // Mock payment page mimics an external gateway, so we hide our chrome too.
   const hideHeader = loc.pathname === '/login'
     || loc.pathname === '/register'
+    || loc.pathname === '/forgot-password'
+    || loc.pathname.startsWith('/password-reset/')
     || loc.pathname.startsWith('/payment/')
     || loc.pathname.startsWith('/invoice/')
 
@@ -54,6 +58,8 @@ function App() {
         <Route path="/p/:slug" element={<ProductPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/password-reset/:token" element={<PasswordResetPage />} />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/orders/:orderNumber" element={<OrderConfirmationPage />} />

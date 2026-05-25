@@ -65,8 +65,18 @@ export function UsersPage() {
     }
   }
 
-  const sendPasswordReset = (u: AdminUserRow) => {
-    push(`איפוס סיסמה ל-${u.email} — בקרוב`)
+  const sendPasswordReset = async (u: AdminUserRow) => {
+    if (busy) return
+    if (!confirm(`לשלוח אימייל איפוס סיסמה אל ${u.email}?`)) return
+    setBusy(u.id)
+    try {
+      await api(`/api/admin/users/${u.id}/password-reset`, { method: 'POST' })
+      push('נשלח אימייל איפוס סיסמה')
+    } catch (e: any) {
+      push(e.message ?? 'שגיאה')
+    } finally {
+      setBusy(null)
+    }
   }
 
   const rows = data?.content ?? []
@@ -168,8 +178,9 @@ export function UsersPage() {
                   <button
                     className="hm-btn hm-btn-quiet"
                     style={{ padding: '4px 10px', fontSize: 12 }}
+                    disabled={busy === u.id}
                     onClick={() => sendPasswordReset(u)}
-                    title="איפוס סיסמה (בקרוב)"
+                    title="שלח אימייל איפוס סיסמה"
                   >
                     איפוס סיסמה
                   </button>

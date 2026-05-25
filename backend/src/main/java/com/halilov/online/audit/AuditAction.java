@@ -48,4 +48,8 @@ public final class AuditAction {
     public static final String USER_ENABLED        = "USER_ENABLED";
     public static final String USER_DISABLED       = "USER_DISABLED";
     public static final String USER_FORCE_LOGOUT   = "USER_FORCE_LOGOUT";
+
+    // password reset
+    public static final String PASSWORD_RESET_REQUESTED = "PASSWORD_RESET_REQUESTED";
+    public static final String PASSWORD_RESET_COMPLETED = "PASSWORD_RESET_COMPLETED";
 }

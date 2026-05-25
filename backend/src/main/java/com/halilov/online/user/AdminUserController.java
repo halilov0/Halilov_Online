@@ -12,6 +12,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.halilov.online.audit.AuditAction;
 import com.halilov.online.audit.AuditService;
+import com.halilov.online.auth.PasswordResetService;
 import com.halilov.online.order.OrderRepository;
 import com.halilov.online.order.OrderStatus;
 
@@ -28,11 +29,14 @@ public class AdminUserController {
     private final UserRepository users;
     private final OrderRepository orders;
     private final AuditService audit;
+    private final PasswordResetService resetService;
 
-    public AdminUserController(UserRepository users, OrderRepository orders, AuditService audit) {
+    public AdminUserController(UserRepository users, OrderRepository orders,
+                               AuditService audit, PasswordResetService resetService) {
         this.users = users;
         this.orders = orders;
         this.audit = audit;
+        this.resetService = resetService;
     }
 
     /** Paginated user list with per-row order/spend stats. Simple in-memory
@@ -78,6 +82,12 @@ public class AdminUserController {
                 (u.isEnabled() ? "חשבון הופעל מחדש: " : "חשבון הושבת: ") + u.getEmail());
         }
         return AdminUserRow.of(u, null);
+    }
+
+    @PostMapping("/{id}/password-reset")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void triggerPasswordReset(@PathVariable Long id) {
+        resetService.requestForUser(id);
     }
 
     @PostMapping("/{id}/force-logout")
