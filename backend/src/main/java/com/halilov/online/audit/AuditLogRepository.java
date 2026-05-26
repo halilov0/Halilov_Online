@@ -72,4 +72,60 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long>, JpaSp
            nativeQuery = true)
     long countActionSince(@org.springframework.data.repository.query.Param("action") String action,
                           @org.springframework.data.repository.query.Param("since") Instant since);
+
+    @Query(value = """
+        SELECT actor_email AS scope, COUNT(*) AS cnt
+        FROM audit_log
+        WHERE action = :action AND actor_ip = :ip
+          AND created_at >= :since AND actor_email IS NOT NULL
+        GROUP BY actor_email
+        ORDER BY COUNT(*) DESC
+        LIMIT :maxRows
+        """, nativeQuery = true)
+    List<ScopeCount> topEmailsForIp(@org.springframework.data.repository.query.Param("action") String action,
+                                    @org.springframework.data.repository.query.Param("ip") String ip,
+                                    @org.springframework.data.repository.query.Param("since") Instant since,
+                                    @org.springframework.data.repository.query.Param("maxRows") int maxRows);
+
+    @Query(value = """
+        SELECT actor_ip AS scope, COUNT(*) AS cnt
+        FROM audit_log
+        WHERE action = :action AND actor_email = :email
+          AND created_at >= :since AND actor_ip IS NOT NULL
+        GROUP BY actor_ip
+        ORDER BY COUNT(*) DESC
+        LIMIT :maxRows
+        """, nativeQuery = true)
+    List<ScopeCount> topIpsForEmail(@org.springframework.data.repository.query.Param("action") String action,
+                                    @org.springframework.data.repository.query.Param("email") String email,
+                                    @org.springframework.data.repository.query.Param("since") Instant since,
+                                    @org.springframework.data.repository.query.Param("maxRows") int maxRows);
+
+    @Query(value = """
+        SELECT actor_email AS scope, COUNT(*) AS cnt
+        FROM audit_log
+        WHERE action = :action AND created_at >= :since AND actor_email IS NOT NULL
+        GROUP BY actor_email
+        ORDER BY COUNT(*) DESC
+        LIMIT :maxRows
+        """, nativeQuery = true)
+    List<ScopeCount> topActorsForAction(@org.springframework.data.repository.query.Param("action") String action,
+                                        @org.springframework.data.repository.query.Param("since") Instant since,
+                                        @org.springframework.data.repository.query.Param("maxRows") int maxRows);
+
+    @Query(value = """
+        SELECT COUNT(*) FROM audit_log
+        WHERE action = :action AND actor_email = :email AND created_at >= :since
+        """, nativeQuery = true)
+    long countActionForEmailSince(@org.springframework.data.repository.query.Param("action") String action,
+                                  @org.springframework.data.repository.query.Param("email") String email,
+                                  @org.springframework.data.repository.query.Param("since") Instant since);
+
+    @Query(value = """
+        SELECT COUNT(*) FROM audit_log
+        WHERE action = :action AND actor_ip = :ip AND created_at >= :since
+        """, nativeQuery = true)
+    long countActionForIpSince(@org.springframework.data.repository.query.Param("action") String action,
+                               @org.springframework.data.repository.query.Param("ip") String ip,
+                               @org.springframework.data.repository.query.Param("since") Instant since);
 }
