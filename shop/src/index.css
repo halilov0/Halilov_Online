@@ -2962,6 +2962,61 @@ select.hm-input { appearance: none; background-image: linear-gradient(45deg, tra
 }
 
 /* ============================================================
+   Cookie consent banner
+============================================================ */
+.hm-cookie-banner {
+  position: fixed;
+  bottom: 16px;
+  inset-inline-end: 16px;
+  inset-inline-start: 16px;
+  max-width: 720px;
+  margin-inline-start: auto;
+  z-index: 9995;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  background: #0f1014;
+  color: #e7e7ea;
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: var(--r-md);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.28);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.hm-cookie-text { flex: 1; }
+.hm-cookie-text a {
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.hm-cookie-accept {
+  flex-shrink: 0;
+  padding: 9px 18px;
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: var(--accent-on);
+  border: none;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.hm-cookie-accept:hover { background: var(--accent-deep); }
+@media (max-width: 720px) {
+  .hm-cookie-banner {
+    flex-direction: column;
+    align-items: stretch;
+    bottom: 12px;
+    inset-inline-end: 12px;
+    inset-inline-start: 12px;
+    padding: 12px 14px;
+    font-size: 12.5px;
+  }
+  .hm-cookie-accept { width: 100%; padding: 10px 14px; }
+}
+
+/* ============================================================
    Static info pages (about / shipping / returns / terms / privacy / faq / contact)
 ============================================================ */
 .hm-info-page {

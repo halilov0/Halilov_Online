@@ -3,6 +3,7 @@ import { Routes, Route, useLocation } from 'react-router-dom'
 import { Header } from './components/Header'
 import { ToastHost } from './components/Toast'
 import { WhatsAppFab } from './components/WhatsAppFab'
+import { CookieBanner } from './components/CookieBanner'
 import { CatalogPage } from './pages/CatalogPage'
 import { ProductPage } from './pages/ProductPage'
 import { LoginPage } from './pages/LoginPage'
@@ -79,6 +80,7 @@ function App() {
         <Route path="*" element={<div className="hm-page"><h1>404</h1></div>} />
       </Routes>
       {!hideHeader && <WhatsAppFab />}
+      {!hideHeader && <CookieBanner />}
       <ToastHost />
     </>
   )
