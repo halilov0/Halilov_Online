@@ -39,9 +39,11 @@ management:
 
 app:
   admin:
-    # Comma-separated IPs that bypass the admin 2FA challenge. Set to your
-    # home / office IP via ifconfig.me. Empty = 2FA always required once
-    # an admin has enrolled. Resolved against the real client IP behind nginx.
+    # Comma-separated IPs or CIDR blocks that bypass the admin 2FA challenge.
+    # Bare IPv4 / IPv6 ({@code 1.2.3.4}, {@code 2a00:...:20ed}) or CIDR
+    # ({@code 10.0.0.0/8}, {@code 2a00:a041:e9c4:f400::/64}). Prefer /64 for
+    # IPv6 — SLAAC rotates the host portion, only the prefix is stable.
+    # Empty = 2FA always required once an admin has enrolled.
     trustedIps: ${ADMIN_TRUSTED_IPS:}
   totp:
     # Label shown in the user's authenticator app (Google Authenticator, etc).
