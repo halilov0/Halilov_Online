@@ -109,12 +109,14 @@ services:
       PGDATABASE: ${POSTGRES_DB:-halilov}
       BACKUP_CRON: ${BACKUP_CRON:-15 3 * * *}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      AUDIT_EXPORT_CRON: ${AUDIT_EXPORT_CRON:-5 * * * *}
       # Optional vars use empty default so compose parses cleanly when --profile
       # backup is NOT active. backup.sh enforces required values at runtime.
       BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
       BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
       BACKUP_S3_PREFIX: ${BACKUP_S3_PREFIX:-halilov/postgres}
       BACKUP_S3_REGION: ${BACKUP_S3_REGION:-auto}
+      AUDIT_S3_PREFIX: ${AUDIT_S3_PREFIX:-halilov/audit}
       AWS_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_ACCESS_KEY:-}
 
