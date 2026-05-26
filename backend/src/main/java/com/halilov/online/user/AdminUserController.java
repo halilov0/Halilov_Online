@@ -101,6 +101,20 @@ public class AdminUserController {
         return AdminUserRow.of(u, null);
     }
 
+    /** Clears any auto-lockout state so the user can sign in again right away.
+     *  Resets failed-attempt counter too. */
+    @PostMapping("/{id}/unlock")
+    public AdminUserRow unlock(@PathVariable Long id) {
+        User u = users.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "user not found"));
+        u.setFailedLoginCount(0);
+        u.setLockedUntil(null);
+        users.save(u);
+        audit.record(AuditAction.USER_FORCE_LOGOUT, "user", u.getId(),
+            "ננעל ידנית שוחרר: " + u.getEmail());
+        return AdminUserRow.of(u, null);
+    }
+
     private Map<Long, long[]> computeStats() {
         // [orderCount, spendAgorot] keyed by user_id, only counting orders that
         // actually generated revenue (PAID through SHIPPED/DELIVERED; refunds

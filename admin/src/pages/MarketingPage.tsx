@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import DOMPurify from 'dompurify'
 import { api } from '../api'
 import { Field } from '../components/Field'
 import { useToast } from '../components/Toast'
@@ -24,6 +25,10 @@ export function MarketingPage() {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastResult, setLastResult] = useState<BroadcastResult | null>(null)
+
+  // Backend re-sanitizes on broadcast — this client pass keeps the preview
+  // from executing anything the admin pasted (self-XSS in the live preview).
+  const safePreview = useMemo(() => DOMPurify.sanitize(htmlBody), [htmlBody])
 
   function loadCount() {
     api<RecipientCount>('/api/admin/marketing/recipients')
@@ -99,7 +104,7 @@ export function MarketingPage() {
               background: '#f7f5f0', padding: 16, borderRadius: 8,
               border: '1px solid var(--line)', maxHeight: 420, overflow: 'auto',
             }}
-            dangerouslySetInnerHTML={{ __html: htmlBody }}
+            dangerouslySetInnerHTML={{ __html: safePreview }}
           />
         </div>
 

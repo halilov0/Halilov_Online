@@ -4,6 +4,8 @@ import com.halilov.online.notification.EmailMessage;
 import com.halilov.online.notification.EmailService;
 import com.halilov.online.user.User;
 import com.halilov.online.user.UserRepository;
+import org.jsoup.Jsoup;
+import org.jsoup.safety.Safelist;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,13 +49,19 @@ public class MarketingService {
 
     @Transactional
     public MarketingDtos.BroadcastResult broadcast(MarketingDtos.BroadcastRequest req) {
+        // Even though only admin can author this HTML, sanitize before send:
+        // an admin pasting a template from somewhere could smuggle event
+        // handlers / external <script>/<iframe> that hurts deliverability
+        // (Brevo's spam classifier penalizes risky markup) or fetches
+        // tracking pixels we never approved.
+        String safeBody = sanitize(req.htmlBody());
         List<User> recipients = users.findAllByMarketingOptInTrueAndEnabledTrue();
         int queued = 0;
         for (User u : recipients) {
             if (u.getUnsubscribeToken() == null || u.getUnsubscribeToken().isBlank()) {
                 u.setUnsubscribeToken(UUID.randomUUID().toString().replace("-", ""));
             }
-            String html = wrap(req.htmlBody(), u.getUnsubscribeToken());
+            String html = wrap(safeBody, u.getUnsubscribeToken());
             try {
                 emails.send(new EmailMessage(u.getEmail(), u.getFullName(), req.subject(), html));
                 queued++;
@@ -79,6 +87,21 @@ public class MarketingService {
             log.info("[marketing] unsubscribed user={}", u.getEmail());
         }
         return u.getEmail();
+    }
+
+    /** Allowlist of tags + attributes safe to include in a marketing email.
+     *  Built once, reused per broadcast. relaxed() covers headings/lists/
+     *  basic formatting; we additionally permit inline {@code style} on
+     *  common containers so admin-typed templates keep their layout. */
+    private static final Safelist EMAIL_SAFELIST = Safelist.relaxed()
+        .addAttributes(":all", "style")
+        .addAttributes("a", "target", "rel")
+        .addProtocols("a", "href", "http", "https", "mailto")
+        .addProtocols("img", "src", "http", "https", "data");
+
+    private String sanitize(String html) {
+        if (html == null || html.isEmpty()) return "";
+        return Jsoup.clean(html, EMAIL_SAFELIST);
     }
 
     private String wrap(String html, String token) {

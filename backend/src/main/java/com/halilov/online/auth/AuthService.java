@@ -20,6 +20,11 @@ import java.util.UUID;
 @Service
 public class AuthService {
 
+    /** Failed-attempt threshold per account before lockout kicks in. */
+    private static final int MAX_FAILED_LOGINS = 5;
+    /** How long an account stays locked after the threshold is crossed. */
+    private static final java.time.Duration LOCKOUT_DURATION = java.time.Duration.ofMinutes(15);
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
@@ -60,21 +65,62 @@ public class AuthService {
         return toToken(user);
     }
 
+    @Transactional
     public AuthDtos.TokenResponse login(AuthDtos.LoginRequest req) {
         String email = req.email().toLowerCase().trim();
         User user = userRepository.findByEmail(email).orElse(null);
-        if (user == null || !passwordEncoder.matches(req.password(), user.getPasswordHash())) {
-            audit.recordAs(user == null ? null : user.getId(), email,
-                user == null ? null : user.getRole().name(),
-                AuditAction.USER_LOGIN_FAILED, "user", user == null ? null : user.getId(),
+
+        // Unknown email — same generic 401, no counter to bump.
+        if (user == null) {
+            audit.recordAs(null, email, null,
+                AuditAction.USER_LOGIN_FAILED, "user", null,
                 "ניסיון התחברות נכשל: " + email, null);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "bad credentials");
         }
+
+        // Lockout check runs before bcrypt so a hammering attacker burns no
+        // CPU while the account is cooling down. Surfacing the lockout in
+        // the response is intentional UX — the real user already knows the
+        // account exists, and an attacker who's been incrementing the
+        // counter likewise knows it exists.
+        Instant now = Instant.now();
+        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(now)) {
+            long minutes = Math.max(1, java.time.Duration.between(now, user.getLockedUntil()).toMinutes() + 1);
+            audit.recordAs(user.getId(), user.getEmail(), user.getRole().name(),
+                AuditAction.USER_LOGIN_FAILED, "user", user.getId(),
+                "ניסיון התחברות לחשבון נעול: " + email, null);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                "החשבון ננעל זמנית עקב ניסיונות חוזרים. נסו שוב בעוד " + minutes + " דקות.");
+        }
+
+        if (!passwordEncoder.matches(req.password(), user.getPasswordHash())) {
+            int failed = user.getFailedLoginCount() + 1;
+            user.setFailedLoginCount(failed);
+            if (failed >= MAX_FAILED_LOGINS) {
+                user.setLockedUntil(now.plus(LOCKOUT_DURATION));
+                user.setFailedLoginCount(0);
+                audit.recordAs(user.getId(), user.getEmail(), user.getRole().name(),
+                    AuditAction.USER_LOGIN_LOCKED, "user", user.getId(),
+                    "חשבון נעול אוטומטית לאחר " + MAX_FAILED_LOGINS + " ניסיונות כושלים: " + email, null);
+            } else {
+                audit.recordAs(user.getId(), user.getEmail(), user.getRole().name(),
+                    AuditAction.USER_LOGIN_FAILED, "user", user.getId(),
+                    "ניסיון התחברות נכשל: " + email + " (" + failed + "/" + MAX_FAILED_LOGINS + ")", null);
+            }
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "bad credentials");
+        }
+
         if (!user.isEnabled()) {
             audit.recordAs(user.getId(), user.getEmail(), user.getRole().name(),
                 AuditAction.USER_LOGIN_FAILED, "user", user.getId(),
                 "ניסיון התחברות לחשבון מושבת: " + email, null);
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "account disabled");
+        }
+
+        // Successful login — clear any partial failure state.
+        if (user.getFailedLoginCount() != 0 || user.getLockedUntil() != null) {
+            user.setFailedLoginCount(0);
+            user.setLockedUntil(null);
         }
         audit.recordAs(user.getId(), user.getEmail(), user.getRole().name(),
             AuditAction.USER_LOGIN, "user", user.getId(),

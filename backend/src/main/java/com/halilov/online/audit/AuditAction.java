@@ -12,6 +12,7 @@ public final class AuditAction {
     public static final String USER_REGISTER       = "USER_REGISTER";
     public static final String USER_LOGIN          = "USER_LOGIN";
     public static final String USER_LOGIN_FAILED   = "USER_LOGIN_FAILED";
+    public static final String USER_LOGIN_LOCKED   = "USER_LOGIN_LOCKED";
 
     // orders (customer)
     public static final String ORDER_PLACED        = "ORDER_PLACED";

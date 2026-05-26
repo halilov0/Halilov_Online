@@ -48,6 +48,12 @@ public class User {
     @Column(name = "force_logout_at")
     private Instant forceLogoutAt;
 
+    @Column(name = "failed_login_count", nullable = false)
+    private int failedLoginCount = 0;
+
+    @Column(name = "locked_until")
+    private Instant lockedUntil;
+
     @PreUpdate
     void onUpdate() { this.updatedAt = Instant.now(); }
 
@@ -74,4 +80,8 @@ public class User {
     public Instant getUpdatedAt() { return updatedAt; }
     public Instant getForceLogoutAt() { return forceLogoutAt; }
     public void setForceLogoutAt(Instant forceLogoutAt) { this.forceLogoutAt = forceLogoutAt; }
+    public int getFailedLoginCount() { return failedLoginCount; }
+    public void setFailedLoginCount(int failedLoginCount) { this.failedLoginCount = failedLoginCount; }
+    public Instant getLockedUntil() { return lockedUntil; }
+    public void setLockedUntil(Instant lockedUntil) { this.lockedUntil = lockedUntil; }
 }
