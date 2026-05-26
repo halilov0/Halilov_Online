@@ -67,25 +67,35 @@ export function CartPage() {
                   <div className="info-wrap">
                     <Link to={`/p/${line.slug}`} className="name">{line.nameHe}</Link>
                     <div className="unit">{formatPrice(line.priceAgorot)} ליחידה</div>
-                    <a className="rm" onClick={() => remove(line.productId)}>הסר</a>
                   </div>
-                  <div className="cls-qty">
+                  <div className="qty-wrap">
+                    <div className="cls-qty">
+                      <button
+                        type="button"
+                        onClick={() => setQty(line.productId, line.quantity - 1)}
+                        disabled={line.quantity <= 1}
+                        aria-label="פחות"
+                      >
+                        <Icon name="minus" size={14} stroke={2.2} />
+                      </button>
+                      <span className="val">{line.quantity}</span>
+                      <button
+                        type="button"
+                        onClick={() => setQty(line.productId, line.quantity + 1)}
+                        disabled={line.quantity >= 99}
+                        aria-label="עוד"
+                      >
+                        <Icon name="plus" size={14} stroke={2.2} />
+                      </button>
+                    </div>
                     <button
                       type="button"
-                      onClick={() => setQty(line.productId, line.quantity - 1)}
-                      disabled={line.quantity <= 1}
-                      aria-label="פחות"
+                      className="rm-btn"
+                      onClick={() => remove(line.productId)}
+                      aria-label="הסר"
+                      title="הסר"
                     >
-                      <Icon name="minus" size={14} stroke={2.2} />
-                    </button>
-                    <span className="val">{line.quantity}</span>
-                    <button
-                      type="button"
-                      onClick={() => setQty(line.productId, line.quantity + 1)}
-                      disabled={line.quantity >= 99}
-                      aria-label="עוד"
-                    >
-                      <Icon name="plus" size={14} stroke={2.2} />
+                      <Icon name="trash" size={16} stroke={1.8} />
                     </button>
                   </div>
                   <div className="line-total">

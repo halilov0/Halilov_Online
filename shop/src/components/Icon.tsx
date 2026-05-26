@@ -3,7 +3,7 @@ import type { ReactElement } from 'react'
 type IconName =
   | 'search' | 'cart' | 'user' | 'heart' | 'plus' | 'minus' | 'chev'
   | 'leaf' | 'arrow' | 'bag' | 'check' | 'truck' | 'secure' | 'pkg' | 'x' | 'menu'
-  | 'pin' | 'phone' | 'bolt' | 'grid' | 'chev-d' | 'share' | 'link'
+  | 'pin' | 'phone' | 'bolt' | 'grid' | 'chev-d' | 'share' | 'link' | 'trash'
 
 const PATHS: Record<IconName, ReactElement> = {
   search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></>,
@@ -29,6 +29,7 @@ const PATHS: Record<IconName, ReactElement> = {
   'chev-d': <><path d="m6 9 6 6 6-6" /></>,
   share:  <><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="6" r="2.5" /><circle cx="18" cy="18" r="2.5" /><path d="m8 11 8-4M8 13l8 4" /></>,
   link:   <><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 1 0-5.66-5.66l-1.5 1.5" /><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 1 0 5.66 5.66l1.5-1.5" /></>,
+  trash:  <><path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M19 6 17.5 20a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" /></>,
 }
 
 export function Icon({ name, size = 18, stroke = 1.6 }: { name: IconName; size?: number; stroke?: number }) {
