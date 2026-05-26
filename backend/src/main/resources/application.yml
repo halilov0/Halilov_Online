@@ -48,6 +48,11 @@ app:
   totp:
     # Label shown in the user's authenticator app (Google Authenticator, etc).
     issuer: ${TOTP_ISSUER:Halilov Admin}
+  security:
+    # Where the AnomalyMonitor sends alerts (failed-login bursts, sign-up
+    # abuse, cancellation spikes). Falls back to app.email.adminBcc when not
+    # set. Empty + empty adminBcc = monitor runs no-op (logs only).
+    alertEmail: ${SECURITY_ALERT_EMAIL:${EMAIL_ADMIN_BCC:}}
   cors:
     # Comma-separated origins permitted to call /api/**. Empty = deny all
     # cross-origin requests (the default, since SPA + API share an origin via

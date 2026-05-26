@@ -39,4 +39,37 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long>, JpaSp
 
     @Query("SELECT DISTINCT a.action FROM AuditLog a ORDER BY a.action")
     List<String> distinctActions();
+
+    /** Native projection used by the anomaly monitor. */
+    interface ScopeCount {
+        String getScope();
+        Long getCnt();
+    }
+
+    @Query(value = """
+        SELECT actor_email AS scope, COUNT(*) AS cnt
+        FROM audit_log
+        WHERE action = :action AND created_at >= :since AND actor_email IS NOT NULL
+        GROUP BY actor_email
+        HAVING COUNT(*) >= :threshold
+        """, nativeQuery = true)
+    List<ScopeCount> groupByActorEmailSince(@org.springframework.data.repository.query.Param("action") String action,
+                                            @org.springframework.data.repository.query.Param("since") Instant since,
+                                            @org.springframework.data.repository.query.Param("threshold") long threshold);
+
+    @Query(value = """
+        SELECT actor_ip AS scope, COUNT(*) AS cnt
+        FROM audit_log
+        WHERE action = :action AND created_at >= :since AND actor_ip IS NOT NULL
+        GROUP BY actor_ip
+        HAVING COUNT(*) >= :threshold
+        """, nativeQuery = true)
+    List<ScopeCount> groupByActorIpSince(@org.springframework.data.repository.query.Param("action") String action,
+                                         @org.springframework.data.repository.query.Param("since") Instant since,
+                                         @org.springframework.data.repository.query.Param("threshold") long threshold);
+
+    @Query(value = "SELECT COUNT(*) FROM audit_log WHERE action = :action AND created_at >= :since",
+           nativeQuery = true)
+    long countActionSince(@org.springframework.data.repository.query.Param("action") String action,
+                          @org.springframework.data.repository.query.Param("since") Instant since);
 }
