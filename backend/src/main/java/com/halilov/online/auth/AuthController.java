@@ -62,5 +62,5 @@ public class AuthController {
     }
 
     public record ForgotPasswordRequest(@Email @NotBlank String email) {}
-    public record CompleteResetRequest(@NotBlank @Size(min = 6, max = 100) String newPassword) {}
+    public record CompleteResetRequest(@NotBlank @Size(min = 8, max = 100) String newPassword) {}
 }

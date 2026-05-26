@@ -95,7 +95,7 @@ public class PasswordResetService {
      */
     @Transactional
     public void complete(String token, String newPassword) {
-        if (newPassword == null || newPassword.length() < 6) {
+        if (newPassword == null || newPassword.length() < 8) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "password too short");
         }
         PasswordResetToken row = loadRedeemable(token);

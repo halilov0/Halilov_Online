@@ -43,6 +43,10 @@ services:
       # Cap JVM heap so the backend coexists with Postgres + nginx on a 1GB VM.
       # SerialGC keeps GC threads minimal on a single-OCPU machine.
       JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xms128m -Xmx320m -XX:+UseSerialGC -XX:MaxMetaspaceSize=160m}
+      # Default to "disabled" in prod so the mock-pay endpoint cannot be hit by
+      # customers (would let anyone mark their own order PAID without paying).
+      # Set PAYMENT_PROVIDER=mock in .env only for staging/QA, "grow" once real.
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-disabled}
       R2_ENDPOINT: ${R2_ENDPOINT:-}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}

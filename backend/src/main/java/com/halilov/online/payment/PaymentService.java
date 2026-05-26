@@ -39,29 +39,45 @@ public class PaymentService {
     }
 
     public PaymentDtos.InitiateResponse initiate(String email, String orderNumber) {
+        requireProviderEnabled();
         Order order = loadOwnPendingOrder(email, orderNumber);
         return respond(order);
     }
 
     public PaymentDtos.InitiateResponse initiateGuest(String orderNumber, String token) {
+        requireProviderEnabled();
         Order order = loadGuestPendingOrder(orderNumber, token);
         return respond(order);
     }
 
     public PaymentDtos.InitiateResponse completeMock(String email, String orderNumber, String outcome) {
-        if (!"mock".equals(provider)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "mock complete is disabled");
-        }
+        requireMockProvider();
         Order order = loadOwnPendingOrder(email, orderNumber);
         return applyMockOutcome(order, outcome);
     }
 
     public PaymentDtos.InitiateResponse completeMockGuest(String orderNumber, String token, String outcome) {
+        requireMockProvider();
+        Order order = loadGuestPendingOrder(orderNumber, token);
+        return applyMockOutcome(order, outcome);
+    }
+
+    /**
+     * In prod we default {@code app.payment.provider} to {@code disabled} so
+     * the mock-complete endpoint cannot be hit. Hard-stops the "anyone marks
+     * their own order PAID" path until a real gateway is wired.
+     */
+    private void requireProviderEnabled() {
+        if ("disabled".equals(provider)) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                "התשלום אינו זמין כרגע. נציג ייצור איתך קשר להשלמת ההזמנה.");
+        }
+    }
+
+    private void requireMockProvider() {
         if (!"mock".equals(provider)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "mock complete is disabled");
         }
-        Order order = loadGuestPendingOrder(orderNumber, token);
-        return applyMockOutcome(order, outcome);
     }
 
     private PaymentDtos.InitiateResponse respond(Order order) {

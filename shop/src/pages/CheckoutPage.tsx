@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, Fragment } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import {
-  api, formatPrice, rememberGuestOrder,
+  api, ApiError, formatPrice, rememberGuestOrder,
   type CouponValidateResponse, type CreateOrderRequest,
   type DeliveryQuote, type OrderView, type SavedAddress,
 } from '../api'
@@ -281,16 +281,29 @@ export function CheckoutPage() {
       if (!user && order.guestToken) {
         rememberGuestOrder(order.orderNumber, order.guestToken)
       }
-      const pay = await api<{ provider: string; redirectUrl: string; orderNumber: string }>(
-        `/api/orders/${order.orderNumber}/pay`,
-        { method: 'POST' }
-      )
-      if (pay.redirectUrl.startsWith('http://') || pay.redirectUrl.startsWith('https://')) {
-        void clearAll()
-        window.location.href = pay.redirectUrl
-      } else {
-        nav(pay.redirectUrl)
-        setTimeout(() => { void clearAll() }, 50)
+      try {
+        const pay = await api<{ provider: string; redirectUrl: string; orderNumber: string }>(
+          `/api/orders/${order.orderNumber}/pay`,
+          { method: 'POST' }
+        )
+        if (pay.redirectUrl.startsWith('http://') || pay.redirectUrl.startsWith('https://')) {
+          void clearAll()
+          window.location.href = pay.redirectUrl
+        } else {
+          nav(pay.redirectUrl)
+          setTimeout(() => { void clearAll() }, 50)
+        }
+      } catch (payErr) {
+        // Payment provider disabled (503) — order is created, just no gateway
+        // to forward to. Land the customer on confirmation so they see their
+        // order number and the "we'll be in touch" copy that page renders for
+        // PENDING orders. Any other error: surface it on the checkout form.
+        if (payErr instanceof ApiError && payErr.status === 503) {
+          void clearAll()
+          nav(`/confirmation/${order.orderNumber}`)
+          return
+        }
+        throw payErr
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'שגיאה ביצירת ההזמנה')

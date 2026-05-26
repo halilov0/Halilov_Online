@@ -60,6 +60,7 @@ export function OrderConfirmationPage() {
   const greetingName = (user?.fullName ?? order.shipping?.fullName ?? '').split(' ')[0]
   const statusLower = order.status.toLowerCase()
   const isCancelled = order.status === 'CANCELLED'
+  const isPending = order.status === 'PENDING'
   const receiptEmail = user?.email ?? order.guestEmail ?? null
 
   return (
@@ -80,6 +81,17 @@ export function OrderConfirmationPage() {
               : (receiptEmail && <> · נשלח אישור אל {receiptEmail}</>)}
           </p>
         </div>
+
+        {isPending && (
+          <div style={{
+            background: '#fff8e7', border: '1px solid #e6c97a',
+            borderRadius: 'var(--r-md)', padding: '14px 18px',
+            margin: '18px 0', fontSize: 14, lineHeight: 1.6, color: 'var(--ink-2)',
+          }}>
+            <strong style={{ color: 'var(--ink)' }}>ההזמנה ממתינה לתשלום.</strong>
+            {' '}נציג ייצור איתך קשר תוך 24 שעות לתיאום השלמת התשלום. אין צורך לבצע את ההזמנה שוב.
+          </div>
+        )}
 
         <div className="cls-confirm-card">
           <div className="head">

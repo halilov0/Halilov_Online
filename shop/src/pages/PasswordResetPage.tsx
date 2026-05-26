@@ -33,7 +33,7 @@ export function PasswordResetPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (password.length < 6) { setSubmitError('הסיסמה חייבת להיות לפחות 6 תווים.'); return }
+    if (password.length < 8) { setSubmitError('הסיסמה חייבת להיות לפחות 8 תווים.'); return }
     if (password !== confirm) { setSubmitError('הסיסמאות לא תואמות.'); return }
     setSubmitting(true)
     setSubmitError(null)
@@ -84,11 +84,11 @@ export function PasswordResetPage() {
             </p>
             <form onSubmit={onSubmit}>
               <Field
-                label="סיסמה חדשה (לפחות 6 תווים)"
+                label="סיסמה חדשה (לפחות 8 תווים)"
                 type="password"
                 required
                 mono
-                minLength={6}
+                minLength={8}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
               />
