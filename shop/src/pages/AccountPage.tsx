@@ -37,13 +37,16 @@ const STATUS_LABEL: Record<OrderView['status'], string> = {
 }
 
 export function AccountPage() {
-  const { user, fetchMe, logout } = useAuth()
+  const { user, token, fetchMe, logout } = useAuth()
   const nav = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const raw = searchParams.get('tab')
   const tab: Tab = raw === 'addresses' ? 'addresses' : raw === 'orders' ? 'orders' : 'profile'
 
-  useEffect(() => { if (!user) nav('/login?next=/account') }, [user, nav])
+  // On F5 the store boots with token from localStorage but user=null until
+  // fetchMe() resolves. Only redirect when there's no token at all — otherwise
+  // wait for the in-flight session hydration.
+  useEffect(() => { if (!token) nav('/login?next=/account') }, [token, nav])
   if (!user) return null
 
   return (
