@@ -1,20 +1,40 @@
 package com.halilov.online.coupon;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
+import com.halilov.online.common.InMemoryThrottle;
+
+import java.time.Duration;
 
 @RestController
 @RequestMapping("/api/coupons")
 public class CouponController {
 
-    private final CouponService coupons;
+    // Caps brute-force enumeration of valid codes. Real users typing/retrying
+    // a code stay well under 20/min; a botnet scanning a dictionary does not.
+    // Edge nginx already limits 10r/s per IP — this is the per-minute backstop.
+    private static final int VALIDATE_MAX_PER_MIN = 20;
 
-    public CouponController(CouponService coupons) {
+    private final CouponService coupons;
+    private final InMemoryThrottle throttle;
+
+    public CouponController(CouponService coupons, InMemoryThrottle throttle) {
         this.coupons = coupons;
+        this.throttle = throttle;
     }
 
     @PostMapping("/validate")
-    public CouponDtos.ValidateResponse validate(@Valid @RequestBody CouponDtos.ValidateRequest req) {
+    public CouponDtos.ValidateResponse validate(@Valid @RequestBody CouponDtos.ValidateRequest req,
+                                                HttpServletRequest http) {
+        String ip = http.getRemoteAddr();
+        if (!throttle.tryAcquire("coupon-validate:ip", ip,
+                VALIDATE_MAX_PER_MIN, Duration.ofMinutes(1))) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "rate limited");
+        }
         return coupons.validate(req);
     }
 }

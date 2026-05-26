@@ -53,6 +53,11 @@ public class PasswordResetService {
         this.siteBaseUrl = siteBaseUrl;
     }
 
+    /** Minimum response time for the public forgot-password endpoint, in ms.
+     *  Matches typical Brevo POST latency (~400-700ms) so an attacker can't
+     *  tell registered emails apart from unknown ones via timing. */
+    private static final long FORGOT_MIN_LATENCY_MS = 800L;
+
     /**
      * Customer-initiated "forgot password" from the login page. Always returns
      * silently — we never confirm or deny that the email maps to an account,
@@ -60,9 +65,26 @@ public class PasswordResetService {
      */
     @Transactional
     public void requestForEmail(String rawEmail) {
-        if (rawEmail == null || rawEmail.isBlank()) return;
-        String email = rawEmail.toLowerCase().trim();
-        users.findByEmail(email).ifPresent(u -> issueAndEmail(u, false));
+        long start = System.nanoTime();
+        try {
+            if (rawEmail == null || rawEmail.isBlank()) return;
+            String email = rawEmail.toLowerCase().trim();
+            users.findByEmail(email).ifPresent(u -> issueAndEmail(u, false));
+        } finally {
+            padResponseTime(start);
+        }
+    }
+
+    /** Sleep until {@link #FORGOT_MIN_LATENCY_MS} has elapsed since {@code startNanos}.
+     *  Equalizes the response time so the existence of an account cannot be
+     *  inferred from how long the request takes. */
+    private static void padResponseTime(long startNanos) {
+        long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
+        long remaining = FORGOT_MIN_LATENCY_MS - elapsedMs;
+        if (remaining > 0) {
+            try { Thread.sleep(remaining); }
+            catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+        }
     }
 
     /**

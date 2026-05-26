@@ -23,6 +23,14 @@ public final class Csv {
     public static String escape(Object v) {
         if (v == null) return "";
         String s = v.toString();
+        // Defuse spreadsheet formula injection: customer-controlled fields
+        // (name, address, notes) get exported to CSV that we open in Excel
+        // for bookkeeping. A leading =, +, -, @, TAB, or CR makes Excel
+        // interpret the cell as a formula. Prefix with a single quote so
+        // Excel/Sheets treat it as literal text instead.
+        if (!s.isEmpty() && "=+-@\t\r".indexOf(s.charAt(0)) >= 0) {
+            s = "'" + s;
+        }
         boolean needsQuoting = s.indexOf(SEP) >= 0 || s.indexOf(QUOTE) >= 0
             || s.indexOf('\r') >= 0 || s.indexOf('\n') >= 0;
         if (!needsQuoting) return s;
