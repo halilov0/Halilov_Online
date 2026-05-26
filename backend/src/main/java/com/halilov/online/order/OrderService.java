@@ -26,7 +26,6 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class OrderService {
@@ -545,17 +544,24 @@ public class OrderService {
         }
     }
 
-    private String generateOrderNumber() {
-        long ts = System.currentTimeMillis();
-        int rand = ThreadLocalRandom.current().nextInt(1000, 9999);
-        return "HO-" + ts + "-" + rand;
-    }
+    // 32-char alphabet minus 0/1/O/I to keep numbers easy to dictate over phone.
+    // 8 chars = 32^8 ≈ 1.1e12 combos — collision odds against the UNIQUE
+    // order_number index are negligible at this scale; DB throws if it ever hits.
+    private static final char[] ORDER_NUMBER_ALPHABET =
+        "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray();
+    private static final SecureRandom RNG = new SecureRandom();
 
-    private static final SecureRandom GUEST_TOKEN_RNG = new SecureRandom();
+    private String generateOrderNumber() {
+        char[] out = new char[8];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = ORDER_NUMBER_ALPHABET[RNG.nextInt(ORDER_NUMBER_ALPHABET.length)];
+        }
+        return "HO-" + new String(out);
+    }
 
     private String generateGuestToken() {
         byte[] buf = new byte[24];
-        GUEST_TOKEN_RNG.nextBytes(buf);
+        RNG.nextBytes(buf);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(buf);
     }
 }
