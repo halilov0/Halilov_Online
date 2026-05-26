@@ -13,6 +13,14 @@ type AuthState = {
   fetchMe: () => Promise<void>
 }
 
+function loginErrorMessage(e: unknown): string {
+  if (e instanceof ApiError) {
+    if (e.status === 401) return 'אימייל או סיסמה שגויים.'
+    if (e.status === 403) return 'החשבון מושבת. ליצירת קשר: halilov.store@gmail.com'
+  }
+  return e instanceof Error ? e.message : 'שגיאת התחברות'
+}
+
 // When the user explicitly authenticates (login/register button), merge the
 // browser cart into the server cart and adopt the merged result. If a token
 // already exists (user-switch without explicit logout), wipe the previous
@@ -44,8 +52,7 @@ export const useAuth = create<AuthState>((set, get) => ({
       })
       await adoptAuth(res.token, set, get().fetchMe)
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'שגיאת התחברות'
-      set({ error: msg })
+      set({ error: loginErrorMessage(e) })
       throw e
     } finally {
       set({ loading: false })

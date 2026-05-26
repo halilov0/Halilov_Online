@@ -55,7 +55,7 @@ export function TopBar() {
           }}
         />
       </form>
-      <a href="http://localhost/" target="_blank" rel="noreferrer" className="hm-btn hm-btn-quiet" style={{ padding: '8px 14px', fontSize: 12.5 }}>
+      <a href="https://halilov.co.il/" target="_blank" rel="noreferrer" className="hm-btn hm-btn-quiet" style={{ padding: '8px 14px', fontSize: 12.5 }}>
         צפה בחנות
       </a>
       <div className="who">
