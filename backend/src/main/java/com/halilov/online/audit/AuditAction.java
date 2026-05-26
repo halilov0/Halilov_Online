@@ -13,6 +13,10 @@ public final class AuditAction {
     public static final String USER_LOGIN          = "USER_LOGIN";
     public static final String USER_LOGIN_FAILED   = "USER_LOGIN_FAILED";
     public static final String USER_LOGIN_LOCKED   = "USER_LOGIN_LOCKED";
+    public static final String USER_LOGIN_2FA_CHALLENGE = "USER_LOGIN_2FA_CHALLENGE";
+    public static final String USER_LOGIN_2FA_FAILED    = "USER_LOGIN_2FA_FAILED";
+    public static final String USER_TOTP_ENROLLED       = "USER_TOTP_ENROLLED";
+    public static final String USER_TOTP_DISABLED       = "USER_TOTP_DISABLED";
 
     // orders (customer)
     public static final String ORDER_PLACED        = "ORDER_PLACED";

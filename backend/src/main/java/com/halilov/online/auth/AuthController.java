@@ -1,5 +1,6 @@
 package com.halilov.online.auth;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -26,9 +27,20 @@ public class AuthController {
         return authService.register(req);
     }
 
+    /**
+     * Returns either a {@link AuthDtos.TokenResponse} (login complete) or a
+     * {@link AuthDtos.ChallengeResponse} (2FA required) — the client checks
+     * for {@code requires2FA} on the response to decide which path to take.
+     */
     @PostMapping("/login")
-    public AuthDtos.TokenResponse login(@Valid @RequestBody AuthDtos.LoginRequest req) {
-        return authService.login(req);
+    public Object login(@Valid @RequestBody AuthDtos.LoginRequest req, HttpServletRequest http) {
+        AuthService.LoginOutcome outcome = authService.login(req, http.getRemoteAddr());
+        return outcome.challenge() != null ? outcome.challenge() : outcome.token();
+    }
+
+    @PostMapping("/login/totp")
+    public AuthDtos.TokenResponse loginTotp(@Valid @RequestBody AuthDtos.TotpLoginRequest req) {
+        return authService.completeTotpLogin(req.challenge(), req.code());
     }
 
     @GetMapping("/me")

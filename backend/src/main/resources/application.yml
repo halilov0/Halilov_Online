@@ -38,6 +38,14 @@ management:
       show-details: when-authorized
 
 app:
+  admin:
+    # Comma-separated IPs that bypass the admin 2FA challenge. Set to your
+    # home / office IP via ifconfig.me. Empty = 2FA always required once
+    # an admin has enrolled. Resolved against the real client IP behind nginx.
+    trustedIps: ${ADMIN_TRUSTED_IPS:}
+  totp:
+    # Label shown in the user's authenticator app (Google Authenticator, etc).
+    issuer: ${TOTP_ISSUER:Halilov Admin}
   cors:
     # Comma-separated origins permitted to call /api/**. Empty = deny all
     # cross-origin requests (the default, since SPA + API share an origin via

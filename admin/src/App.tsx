@@ -12,6 +12,7 @@ import { OrderDetailPage } from './pages/OrderDetailPage'
 import { MarketingPage } from './pages/MarketingPage'
 import { UsersPage } from './pages/UsersPage'
 import { AuditLogPage } from './pages/AuditLogPage'
+import { SecurityPage } from './pages/SecurityPage'
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
           <Route path="/marketing" element={<MarketingPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/audit-log" element={<AuditLogPage />} />
+          <Route path="/security" element={<SecurityPage />} />
         </Route>
         <Route path="*" element={<div style={{ padding: '2rem' }}>404</div>} />
       </Routes>

@@ -17,6 +17,7 @@ const GROWTH_ITEMS: Item[] = [
   { to: '/marketing', label: 'שיווק', icon: 'megaphone' },
   { to: '/users', label: 'לקוחות', icon: 'users' },
   { to: '/audit-log', label: 'לוג פעולות', icon: 'history' },
+  { to: '/security', label: 'אבטחה', icon: 'cog' },
 ]
 
 const GROWTH_LABELS: { label: string; icon: IconName }[] = [

@@ -47,6 +47,11 @@ services:
       # customers (would let anyone mark their own order PAID without paying).
       # Set PAYMENT_PROVIDER=mock in .env only for staging/QA, "grow" once real.
       PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-disabled}
+      # Admin IPs that skip 2FA (your home/office). 2FA always required for
+      # logins from other IPs once an admin enrolls. Leave empty to require
+      # 2FA from everywhere.
+      ADMIN_TRUSTED_IPS: ${ADMIN_TRUSTED_IPS:-}
+      TOTP_ISSUER: ${TOTP_ISSUER:-Halilov Admin}
       R2_ENDPOINT: ${R2_ENDPOINT:-}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}

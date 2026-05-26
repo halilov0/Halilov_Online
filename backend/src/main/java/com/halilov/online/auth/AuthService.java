@@ -7,6 +7,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.halilov.online.audit.AuditAction;
 import com.halilov.online.audit.AuditService;
+import com.halilov.online.auth.totp.TotpChallengeStore;
+import com.halilov.online.auth.totp.TotpService;
+import com.halilov.online.auth.totp.TrustedIpService;
 import com.halilov.online.security.JwtService;
 import com.halilov.online.user.Role;
 import com.halilov.online.user.User;
@@ -29,15 +32,24 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuditService audit;
+    private final TotpService totp;
+    private final TotpChallengeStore challenges;
+    private final TrustedIpService trustedIps;
 
     public AuthService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
-                       AuditService audit) {
+                       AuditService audit,
+                       TotpService totp,
+                       TotpChallengeStore challenges,
+                       TrustedIpService trustedIps) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.audit = audit;
+        this.totp = totp;
+        this.challenges = challenges;
+        this.trustedIps = trustedIps;
     }
 
     @Transactional
@@ -65,8 +77,18 @@ public class AuthService {
         return toToken(user);
     }
 
+    /** Result of step 1 (email + password). Exactly one of {@code token} or
+     *  {@code challenge} is populated. ADMIN with 2FA enabled from a
+     *  non-trusted IP gets a challenge and must call {@link #completeTotpLogin}. */
+    public record LoginOutcome(AuthDtos.TokenResponse token, AuthDtos.ChallengeResponse challenge) {
+        public static LoginOutcome ofToken(AuthDtos.TokenResponse t) { return new LoginOutcome(t, null); }
+        public static LoginOutcome ofChallenge(String c) {
+            return new LoginOutcome(null, new AuthDtos.ChallengeResponse(true, c));
+        }
+    }
+
     @Transactional
-    public AuthDtos.TokenResponse login(AuthDtos.LoginRequest req) {
+    public LoginOutcome login(AuthDtos.LoginRequest req, String clientIp) {
         String email = req.email().toLowerCase().trim();
         User user = userRepository.findByEmail(email).orElse(null);
 
@@ -117,14 +139,53 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "account disabled");
         }
 
-        // Successful login — clear any partial failure state.
+        // Password OK — clear any partial failure state. We don't yet count
+        // this as a successful login because 2FA may still block it.
         if (user.getFailedLoginCount() != 0 || user.getLockedUntil() != null) {
             user.setFailedLoginCount(0);
             user.setLockedUntil(null);
         }
+
+        // 2FA gate: only ADMIN with TOTP enrolled, only when the login is
+        // from an IP not on the trusted list. CUSTOMER never sees 2FA.
+        if (user.getRole() == Role.ADMIN && user.isTotpEnabled() && !trustedIps.isTrusted(clientIp)) {
+            String challenge = challenges.issue(user.getId());
+            audit.recordAs(user.getId(), user.getEmail(), user.getRole().name(),
+                AuditAction.USER_LOGIN_2FA_CHALLENGE, "user", user.getId(),
+                "אתגר 2FA נדרש מ-IP " + (clientIp == null ? "?" : clientIp), null);
+            return LoginOutcome.ofChallenge(challenge);
+        }
+
         audit.recordAs(user.getId(), user.getEmail(), user.getRole().name(),
             AuditAction.USER_LOGIN, "user", user.getId(),
             "התחברות: " + user.getEmail(), null);
+        return LoginOutcome.ofToken(toToken(user));
+    }
+
+    /** Step 2 of the admin 2FA flow. Consumes the challenge, validates a
+     *  TOTP code or one-shot recovery code, and issues the JWT. */
+    @Transactional
+    public AuthDtos.TokenResponse completeTotpLogin(String challenge, String code) {
+        Long userId = challenges.consume(challenge);
+        if (userId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "challenge expired");
+        }
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "no user"));
+        if (!user.isEnabled() || !user.isTotpEnabled() || user.getTotpSecret() == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "2fa unavailable");
+        }
+        boolean ok = totp.verifyCode(user.getTotpSecret(), code)
+            || totp.consumeRecoveryCode(user.getId(), code);
+        if (!ok) {
+            audit.recordAs(user.getId(), user.getEmail(), user.getRole().name(),
+                AuditAction.USER_LOGIN_2FA_FAILED, "user", user.getId(),
+                "קוד 2FA שגוי: " + user.getEmail(), null);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "קוד 2FA שגוי");
+        }
+        audit.recordAs(user.getId(), user.getEmail(), user.getRole().name(),
+            AuditAction.USER_LOGIN, "user", user.getId(),
+            "התחברות (אומת 2FA): " + user.getEmail(), null);
         return toToken(user);
     }
 

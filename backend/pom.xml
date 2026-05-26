@@ -105,6 +105,15 @@
             <version>1.18.1</version>
         </dependency>
 
+        <!-- TOTP (RFC 6238) for admin 2FA. Provides secret generation, code
+             verification with a configurable time-window tolerance, and a
+             provisioning-URI builder so the admin UI can render a QR. -->
+        <dependency>
+            <groupId>dev.samstevens.totp</groupId>
+            <artifactId>totp</artifactId>
+            <version>1.7.1</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

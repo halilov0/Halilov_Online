@@ -73,6 +73,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/ping", "/actuator/health", "/error", "/sitemap.xml").permitAll()
                 .requestMatchers("/api/auth/register", "/api/auth/login",
+                                 "/api/auth/login/totp",
                                  "/api/auth/forgot-password",
                                  "/api/auth/password-reset/*").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/media/**", "/api/places/**", "/api/delivery/**").permitAll()
