@@ -6,8 +6,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.List;
-
 /**
  * Server-backed cart for authenticated users under {@code /api/cart}.
  *
@@ -28,21 +26,21 @@ public class CartController {
     }
 
     @GetMapping
-    public List<CartDtos.CartLineView> get(Authentication auth) {
+    public CartDtos.CartResponse get(Authentication auth) {
         return cart.getCart(requireEmail(auth));
     }
 
     /** Continuous-sync replace — full desired state. */
     @PutMapping
-    public List<CartDtos.CartLineView> replace(Authentication auth,
-                                               @Valid @RequestBody CartDtos.CartReplaceRequest req) {
+    public CartDtos.CartResponse replace(Authentication auth,
+                                         @Valid @RequestBody CartDtos.CartReplaceRequest req) {
         return cart.replaceCart(requireEmail(auth), req.items());
     }
 
     /** Login merge — sum incoming with existing rows. */
     @PostMapping("/merge")
-    public List<CartDtos.CartLineView> merge(Authentication auth,
-                                             @Valid @RequestBody CartDtos.CartReplaceRequest req) {
+    public CartDtos.CartResponse merge(Authentication auth,
+                                       @Valid @RequestBody CartDtos.CartReplaceRequest req) {
         return cart.mergeCart(requireEmail(auth), req.items());
     }
 

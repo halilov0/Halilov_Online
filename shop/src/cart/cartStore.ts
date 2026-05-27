@@ -1,8 +1,10 @@
 import { create } from 'zustand'
 import {
   api, ApiError, getToken,
-  type CartLineView, type CartReplaceRequest, type CartUpsertItem, type Product,
+  type CartAdjustment, type CartLineView, type CartReplaceRequest,
+  type CartResponse, type CartUpsertItem, type Product,
 } from '../api'
+import { useToast } from '../components/Toast'
 
 /**
  * Shop cart store. Server-backed for signed-in users, localStorage-only
@@ -11,9 +13,18 @@ import {
  * Mutations are optimistic on the local lines and debounced into a
  * single `PUT /api/cart` (350 ms). Cross-tab updates fan out via
  * `BroadcastChannel` (with a `storage`-event fallback). On tab
- * visibility change the canonical cart is refetched, throttled, so a
- * mutation on another device propagates within a few seconds of the
- * user returning.
+ * visibility change the cart is *reconciled* (throttled): unpushed
+ * local changes are flushed, otherwise the canonical cart is pulled —
+ * so a mutation on another device propagates without clobbering one
+ * this device hasn't synced yet. On `pagehide` a dirty cart does a
+ * final `keepalive` flush so a change made inside the debounce window
+ * survives a tab close.
+ *
+ * Every server read/write returns a `CartResponse` carrying any
+ * adjustments the server made (stock clamp / inactive-product drop).
+ * They're toasted via {@link useToast} and kept in `adjustments` for
+ * the cart page to show inline (banner for drops, per-line note for
+ * clamps), so the cart never mutates silently.
  *
  * Failure handling: 401/403 don't touch the cart (the auth store
  * deals with it). 5xx and network errors retry on the next mutation.
@@ -50,15 +61,27 @@ export type CartLine = {
 
 type CartState = {
   lines: CartLine[]
+  /** Server-side changes (clamp / drop) the user hasn't acknowledged yet, kept
+   *  for inline display on the cart page. Cleared when the user mutates that
+   *  line or dismisses the notice. Page-scoped — not persisted. */
+  adjustments: CartAdjustment[]
   add: (p: Product, quantity?: number) => void
   setQty: (productId: number, quantity: number) => void
   remove: (productId: number) => void
+  /** Dismiss an inline adjustment notice once the user has seen it. */
+  dismissAdjustment: (productId: number) => void
   /** Wipe local lines only. Use clearAll() to also drop the server cart. */
   clearLocal: () => void
   /** Wipe local + server cart. Use after a successful checkout. */
   clearAll: () => Promise<void>
-  /** Pull canonical cart from the server (call on App mount with valid token). */
+  /** Adopt the canonical server cart, clobbering local. Used for rollback and
+   *  the post-login user-switch — callers that may hold unpushed local changes
+   *  should use {@link reconcileWithRemote} instead. */
   loadFromRemote: () => Promise<void>
+  /** Focus/mount sync: if local has unpushed changes, flush them (they're the
+   *  newer intent on the device the user is looking at); otherwise pull the
+   *  canonical cart. Prevents a stale GET from clobbering a local mutation. */
+  reconcileWithRemote: () => Promise<void>
   /** Merge items into the server cart and adopt the result. Defaults to the
    *  whole local cart; pass a subset to merge only those lines. */
   mergeWithRemote: (items?: CartUpsertItem[]) => Promise<void>
@@ -200,8 +223,97 @@ function schedulePush(push: () => Promise<void>) {
   }, PUSH_DEBOUNCE_MS)
 }
 
+/** Flush a pending debounced push without firing it — used by logout so a
+ *  stray timer can't push into a session we're tearing down. */
+export function cancelPendingCartPush() {
+  cancelPendingPush()
+}
+
+// ---------- dirty tracking / server-result adoption ----------
+
+/** True when local lines exactly equal the last server-confirmed baseline. */
+function matchesBaseline(lines: CartLine[]): boolean {
+  const base = getBaseline()
+  if (Object.keys(base).length !== lines.length) return false
+  for (const l of lines) {
+    if (base[l.productId] !== l.quantity) return false
+  }
+  return true
+}
+
+/** Local has changes the server hasn't confirmed (or a push is mid-flight). */
+function cartIsDirty(): boolean {
+  return pushTimer !== null || !matchesBaseline(useCart.getState().lines)
+}
+
+/** Same set of (productId → quantity)? Used to detect whether the user mutated
+ *  the cart while a push was in flight. */
+function sameQuantities(a: CartLine[], b: CartLine[]): boolean {
+  if (a.length !== b.length) return false
+  const m = new Map(a.map(l => [l.productId, l.quantity]))
+  for (const l of b) {
+    if (m.get(l.productId) !== l.quantity) return false
+  }
+  return true
+}
+
+// Removals are terminal (the product is gone), so a focus refresh could report
+// the same dead line every time — dedupe by productId for the page's lifetime
+// so the user is told once, not on every tab focus.
+const toastedRemovals = new Set<number>()
+
+/** Surface server-side cart changes the user didn't ask for, so nothing
+ *  mutates silently. Clamps always toast (they follow a user action);
+ *  removals toast once each. */
+function notifyAdjustments(adjustments: CartAdjustment[] | undefined) {
+  if (!adjustments?.length) return
+  const push = useToast.getState().push
+  for (const a of adjustments) {
+    const name = a.nameHe ?? 'פריט'
+    if (a.type === 'REMOVED') {
+      if (toastedRemovals.has(a.productId)) continue
+      toastedRemovals.add(a.productId)
+      push(`${name} הוסר מהעגלה — אינו זמין במלאי`)
+    } else {
+      push(`${name}: הכמות עודכנה ל-${a.finalQty} (זה המלאי שנותר)`)
+    }
+  }
+}
+
+/** Drop the notice for a product the user just acted on (returns the same ref
+ *  when there's nothing to drop, so we don't churn a new array needlessly). */
+function dropAdjustment(list: CartAdjustment[], productId: number): CartAdjustment[] {
+  return list.some(a => a.productId === productId)
+    ? list.filter(a => a.productId !== productId)
+    : list
+}
+
+/** Fold new server adjustments into the kept set, keyed by productId (a fresh
+ *  notice for a product replaces the previous one). */
+function mergeAdjustmentLists(existing: CartAdjustment[], incoming: CartAdjustment[] | undefined): CartAdjustment[] {
+  if (!incoming?.length) return existing
+  const byId = new Map<number, CartAdjustment>()
+  for (const a of existing) byId.set(a.productId, a)
+  for (const a of incoming) byId.set(a.productId, a)
+  return [...byId.values()]
+}
+
+/** Adopt the canonical cart the server returned: mirror it locally, fan out to
+ *  other tabs, refresh the baseline, keep the adjustments for inline display,
+ *  and toast them. */
+function adoptServerResult(res: CartResponse) {
+  const lines = (res.lines ?? []).map(toCartLine)
+  const adjustments = mergeAdjustmentLists(useCart.getState().adjustments, res.adjustments)
+  save(lines)
+  useCart.setState({ lines, adjustments })
+  broadcastUpdate(lines)
+  setBaseline(lines)
+  notifyAdjustments(res.adjustments)
+}
+
 export const useCart = create<CartState>((set, get) => ({
   lines: load(),
+  adjustments: [],
 
   add(p, quantity = 1) {
     const lines = [...get().lines]
@@ -219,7 +331,8 @@ export const useCart = create<CartState>((set, get) => ({
       })
     }
     save(lines)
-    set({ lines })
+    // Acting on a line clears its stale notice (the user has re-engaged).
+    set({ lines, adjustments: dropAdjustment(get().adjustments, p.id) })
     broadcastUpdate(lines)
     schedulePush(() => get().pushToRemote())
   },
@@ -230,7 +343,7 @@ export const useCart = create<CartState>((set, get) => ({
       l.productId === productId ? { ...l, quantity: q } : l
     )
     save(lines)
-    set({ lines })
+    set({ lines, adjustments: dropAdjustment(get().adjustments, productId) })
     broadcastUpdate(lines)
     schedulePush(() => get().pushToRemote())
   },
@@ -238,20 +351,24 @@ export const useCart = create<CartState>((set, get) => ({
   remove(productId) {
     const lines = get().lines.filter(l => l.productId !== productId)
     save(lines)
-    set({ lines })
+    set({ lines, adjustments: dropAdjustment(get().adjustments, productId) })
     broadcastUpdate(lines)
     schedulePush(() => get().pushToRemote())
   },
 
+  dismissAdjustment(productId) {
+    set({ adjustments: dropAdjustment(get().adjustments, productId) })
+  },
+
   clearLocal() {
     save([])
-    set({ lines: [] })
+    set({ lines: [], adjustments: [] })
     broadcastUpdate([])
   },
 
   async clearAll() {
     save([])
-    set({ lines: [] })
+    set({ lines: [], adjustments: [] })
     broadcastUpdate([])
     cancelPendingPush()
     if (!getToken()) return
@@ -266,14 +383,21 @@ export const useCart = create<CartState>((set, get) => ({
   async loadFromRemote() {
     if (!getToken()) return
     try {
-      const remote = await api<CartLineView[]>('/api/cart')
-      const lines = remote.map(toCartLine)
-      save(lines)
-      set({ lines })
-      broadcastUpdate(lines)
-      setBaseline(lines) // adopted the server cart verbatim — it's now the baseline
+      adoptServerResult(await api<CartResponse>('/api/cart'))
     } catch {
       // leave local intact on failure
+    }
+  },
+
+  async reconcileWithRemote() {
+    if (!getToken()) return
+    if (cartIsDirty()) {
+      // Local holds unpushed changes (or a debounced push is queued). Flush
+      // them rather than pulling — a stale GET would clobber the user's work.
+      cancelPendingPush()
+      await get().pushToRemote()
+    } else {
+      await get().loadFromRemote()
     }
   },
 
@@ -282,15 +406,10 @@ export const useCart = create<CartState>((set, get) => ({
     const payload = items ?? get().lines.map(l => ({ productId: l.productId, quantity: l.quantity }))
     const body: CartReplaceRequest = { items: payload }
     try {
-      const merged = await api<CartLineView[]>('/api/cart/merge', {
+      adoptServerResult(await api<CartResponse>('/api/cart/merge', {
         method: 'POST',
         body: JSON.stringify(body),
-      })
-      const lines = merged.map(toCartLine)
-      save(lines)
-      set({ lines })
-      broadcastUpdate(lines)
-      setBaseline(lines) // server returned the canonical merged cart
+      }))
     } catch {
       // ignore — keep local cart as-is
     }
@@ -306,11 +425,23 @@ export const useCart = create<CartState>((set, get) => ({
     const items = snapshot.map(l => ({ productId: l.productId, quantity: l.quantity }))
     const body: CartReplaceRequest = { items }
     try {
-      await api('/api/cart', {
+      const res = await api<CartResponse>('/api/cart', {
         method: 'PUT',
         body: JSON.stringify(body),
       })
-      setBaseline(snapshot) // server now holds exactly what we just pushed
+      // Adopt the canonical result only if the user hasn't mutated since we
+      // snapshotted. If they have, a newer debounced push is already queued and
+      // will reconcile (and report its own adjustments) — adopting this stale
+      // response would clobber the newer local state.
+      if (sameQuantities(get().lines, snapshot)) {
+        const serverLines = (res.lines ?? []).map(toCartLine)
+        const changed = (res.adjustments?.length ?? 0) > 0 || !sameQuantities(serverLines, snapshot)
+        // Common case: server accepted our cart verbatim — just refresh the
+        // baseline, no re-render/broadcast churn. Only adopt (and toast) when
+        // the server actually changed something.
+        if (changed) adoptServerResult(res)
+        else setBaseline(snapshot)
+      }
     } catch (e) {
       // 401/403: token died — caller (authStore) handles auth state, keep cart.
       // 5xx/network: transient, next mutation will retry via debounce.
@@ -393,5 +524,22 @@ document.addEventListener('visibilitychange', () => {
   const now = Date.now()
   if (now - lastFocusRefreshAt < FOCUS_REFRESH_MIN_MS) return
   lastFocusRefreshAt = now
-  useCart.getState().loadFromRemote()
+  void useCart.getState().reconcileWithRemote()
+})
+
+// Flush unpushed changes when the page is going away (tab close, navigation,
+// mobile backgrounding). Without this, a mutation made inside the 350 ms
+// debounce window is lost if the user closes the tab before it fires — and on
+// the next visit the mount GET would adopt the stale server cart over it.
+//
+// `keepalive` lets the PUT outlive the unloading document; `sendBeacon` can't
+// because it can't set the Authorization header. Fire-and-forget: once we're
+// leaving, the response is irrelevant.
+window.addEventListener('pagehide', () => {
+  if (!getToken()) return
+  if (!cartIsDirty()) return
+  const items = useCart.getState().lines.map(l => ({ productId: l.productId, quantity: l.quantity }))
+  const body: CartReplaceRequest = { items }
+  void api('/api/cart', { method: 'PUT', body: JSON.stringify(body), keepalive: true })
+    .catch(() => { /* page is unloading; nothing to recover */ })
 })

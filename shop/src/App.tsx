@@ -29,12 +29,15 @@ function App() {
   const loc = useLocation()
 
   useEffect(() => {
-    // Validate the persisted token, then hydrate the cart from the server so
-    // changes made in other tabs/devices show up on this mount.
+    // Validate the persisted token, then reconcile the cart with the server so
+    // changes made in other tabs/devices show up on this mount. reconcile (not
+    // a raw load) so unpushed local changes — e.g. an add made just before the
+    // last tab closed inside the debounce window — are flushed instead of being
+    // clobbered by the stale server cart.
     ;(async () => {
       await fetchMe()
       if (getToken()) {
-        await useCart.getState().loadFromRemote()
+        await useCart.getState().reconcileWithRemote()
       }
     })()
     // Pull delivery config (shipping price + free-shipping threshold) so

@@ -328,3 +328,25 @@ export type CartLineView = {
 
 export type CartUpsertItem = { productId: number; quantity: number }
 export type CartReplaceRequest = { items: CartUpsertItem[] }
+
+/**
+ * A change the server made to the desired cart that the client didn't ask for.
+ * `CLAMPED` = quantity cut to available stock (`finalQty` < `requestedQty`);
+ * `REMOVED` = line dropped (inactive / deleted / out of stock, `finalQty` 0;
+ * `nameHe` null when the product no longer exists). The store surfaces these
+ * as toasts so the cart never changes itself silently.
+ */
+export type CartAdjustment = {
+  productId: number
+  nameHe: string | null
+  type: 'CLAMPED' | 'REMOVED'
+  requestedQty: number
+  finalQty: number
+}
+
+/** Canonical cart plus any server-side adjustments — returned by every
+ *  `/api/cart` read/write except DELETE. */
+export type CartResponse = {
+  lines: CartLineView[]
+  adjustments: CartAdjustment[]
+}

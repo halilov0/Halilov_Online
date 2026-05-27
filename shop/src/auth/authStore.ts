@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { api, ApiError, setToken, getToken, type AuthResponse, type Me } from '../api'
-import { useCart, getCartOwner, setCartOwner, clearCartBaseline } from '../cart/cartStore'
+import { useCart, getCartOwner, setCartOwner, clearCartBaseline, cancelPendingCartPush } from '../cart/cartStore'
 
 /**
  * Shop auth store.
@@ -67,6 +67,10 @@ async function adoptAuth(token: string, set: (s: Partial<AuthState>) => void, ge
   const cart = useCart.getState()
   if (prevOwner != null && prevOwner !== myId) {
     cart.clearLocal()
+    // Drop the previous user's baseline too, so if loadFromRemote fails we're
+    // left clean (empty local + empty baseline) rather than "dirty" — otherwise
+    // the next focus sync would flush the empty cart and wipe N's server cart.
+    clearCartBaseline()
     await cart.loadFromRemote()
   } else {
     await cart.mergeAdditionsWithRemote()
@@ -118,7 +122,9 @@ export const useAuth = create<AuthState>((set, get) => ({
     // SAVE_TO_DB(User_Cart) → CLEAR_LOCAL_SESSION. Continuous sync keeps the
     // DB cart fresh during the session; this final push catches any debounced
     // mutation still in flight, then the local cart is wiped so the next
-    // guest visiting this browser starts from zero.
+    // guest visiting this browser starts from zero. Cancel the debounce timer
+    // first so a stray push can't fire into the session we're tearing down.
+    cancelPendingCartPush()
     await useCart.getState().pushToRemote()
     useCart.getState().clearLocal()
     setCartOwner(null)

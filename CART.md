@@ -52,11 +52,22 @@ cart, and out of scope here.)
    (low-latency) **or** the `storage` event (fallback for browsers without
    `BroadcastChannel`). The receiving tab does **not** re-broadcast or re-push.
 3. **Cross-device** — on `visibilitychange` to visible (tab regains focus),
-   a signed-in tab pulls the canonical cart with `GET /api/cart`, throttled to
-   once per **3 s**. Picks up changes made on another device.
+   a signed-in tab **reconciles** with the server (throttled to once per
+   **3 s**): if local has unpushed changes it flushes them (`PUT`), otherwise
+   it pulls the canonical cart (`GET /api/cart`). Picks up changes made on
+   another device without clobbering a local mutation that hasn't synced yet
+   (see §7).
+4. **Unload flush** — on `pagehide` (tab close, navigation, mobile
+   backgrounding) a signed-in tab with unpushed changes fires a final `PUT`
+   with `keepalive: true`, so a mutation made inside the 350 ms debounce window
+   isn't lost if the tab closes before the debounced push fires. (`keepalive`,
+   not `sendBeacon`, because the beacon API can't set the `Authorization`
+   header.)
 
 Quantity is clamped to **1..99** client-side; the server independently clamps
-to `min(99, stock)` and drops inactive/missing products.
+to `min(99, stock)` and drops inactive/missing products. **Whenever the server
+changes the desired cart** (clamp or drop), it returns the change and the
+client shows a toast — the cart never mutates silently (see §9).
 
 ---
 
@@ -64,14 +75,30 @@ to `min(99, stock)` and drops inactive/missing products.
 
 | Store method            | HTTP                | Server does |
 |-------------------------|---------------------|-------------|
-| `loadFromRemote()`      | `GET /api/cart`     | Returns active lines (inactive/zero dropped). |
+| `loadFromRemote()`      | `GET /api/cart`     | Returns active lines (inactive/missing reported as `REMOVED` adjustments). |
 | `pushToRemote()`        | `PUT /api/cart`     | **Replace**: delete all rows, persist the desired set. |
 | `mergeWithRemote(items)`| `POST /api/cart/merge` | **Merge**: `existing + incoming` summed per product, then persisted. |
 | `clearAll()`            | `DELETE /api/cart`  | Delete all rows. |
 
+`GET`/`PUT`/`POST merge` all return a **`CartResponse`** = `{ lines,
+adjustments }`. `adjustments` is the list of changes the server made that the
+client didn't ask for — `CLAMPED` (quantity cut to stock) or `REMOVED`
+(inactive/deleted/out-of-stock). The store toasts them (§9). `DELETE` returns
+`204`.
+
 Server-side `persist()` (used by both replace and merge): sums duplicate
 productIds, drops products that are missing/inactive or `qty <= 0`, clamps each
-line to `min(99, stock)`.
+line to `min(99, stock)`, and **records each drop/clamp as an adjustment**. A
+plain `GET` doesn't clamp (a read never changes stored quantities) but still
+reports inactive/missing lines as `REMOVED`. The request body is capped at
+**200 items** (`@Size`).
+
+`pushToRemote()` **adopts the `CartResponse`** when the local cart is unchanged
+since it snapshotted *and* the server actually altered something — so a
+server-side clamp/drop is reflected locally and toasted, instead of local
+silently diverging from the DB. If the server accepted the cart verbatim it
+just refreshes the baseline (no re-render/broadcast churn); if the user mutated
+mid-flight it defers to the newer queued push.
 
 Important distinction:
 - **Replace** (`PUT`) makes the server exactly equal the local cart.
@@ -90,7 +117,7 @@ that synchronises local and server:
 |----------------------------|------------------|
 | `loadFromRemote()` success | the fetched server cart |
 | `mergeWithRemote()` success| the merged server cart returned |
-| `pushToRemote()` success   | exactly the snapshot that was pushed |
+| `pushToRemote()` success   | the adopted server result, or the pushed snapshot if the server accepted it verbatim |
 | `clearAll()` success       | empty `{}` |
 | `logout()`                 | cleared (removed) |
 | guest mutation (no token)  | **unchanged** — the server never confirmed it |
@@ -155,6 +182,9 @@ The DB cart is intentionally **left intact** — it's restored on the next login
 
 ## 7. Failure handling
 
+- **Success** on `pushToRemote`: adopt the returned `CartResponse` (so a
+  server-side clamp/drop reflects locally + toasts), *unless* the user mutated
+  the cart since the snapshot — then defer to the newer queued push.
 - **401/403** on a cart call: the token died. The cart is left untouched; the
   auth store handles the session. (`pushToRemote` does *not* roll back here.)
 - **5xx / network**: transient. Local stays; the next mutation's debounced push
@@ -163,6 +193,18 @@ The DB cart is intentionally **left intact** — it's restored on the next login
   is something the server rejects. Roll back by `loadFromRemote()` (adopt the
   canonical cart).
 - `loadFromRemote` / `mergeWithRemote` failures: keep local as-is.
+
+### Focus / mount reconcile (the no-clobber rule)
+
+`reconcileWithRemote()` (called on app mount and on focus) does **not** blindly
+adopt the server cart. If local is **dirty** — a debounced push is pending, or
+local lines differ from the baseline — it flushes local (`PUT`) instead of
+pulling. This closes a data-loss race: a stale `GET` (focus refresh, or mount
+after a tab that closed mid-debounce) used to overwrite an unpushed local
+mutation. The device the user is actively on wins its dirty changes; a `GET`
+only adopts when local is already in sync. The raw `loadFromRemote()` (no
+guard) is still used for rollback and the post-login user-switch, where
+clobbering local is the intent.
 
 ---
 
@@ -207,11 +249,22 @@ Review these specifically — they're conscious choices, not oversights:
    token is expired, the DB keeps the old line and it **reappears** after
    re-login. Rationale: keeping an item beats silently dropping one. Additions
    and increases — the common case — are handled.
-2. **Inactive products vanish silently.** A product deactivated in the catalog
-   is dropped by the server on the next load/merge; the line disappears from the
-   cart with no notice.
-3. **Stock clamp can shrink a line.** Every replace/merge clamps to
-   `min(99, stock)`, so a quantity can drop server-side if stock fell.
+2. **Inactive products are dropped — now with a notice.** A product
+   deactivated/deleted in the catalog is dropped by the server on the next
+   load/merge/push and reported as a `REMOVED` adjustment. It's surfaced two
+   ways: a transient toast (so it's seen even off the cart page) and a
+   persistent, dismissible **banner on the cart page** (`cls-cart-alert`).
+   Toasts are deduped per `productId` for the page's lifetime so a focus
+   refresh doesn't re-toast the same dead line.
+3. **Stock clamp shrinks a line — now with a notice.** Every replace/merge
+   clamps to `min(99, stock)`; the resulting `CLAMPED` adjustment shows as a
+   toast *and* an inline note under that line on the cart page
+   (`cls-cart-line-note`). (A plain read doesn't clamp, so this fires on a
+   write — i.e. right when the user is acting on the cart.)
+
+The kept adjustments live in `useCart().adjustments` (page-scoped, not
+persisted). They're cleared when the user mutates that product, dismisses the
+notice, or reloads.
 4. **Stale baseline if the mount load fails.** If `loadFromRemote` fails on app
    mount (network), the baseline may lag the DB until the next successful sync.
    Bounded and self-correcting, but a re-login in that window could merge a

@@ -7,7 +7,7 @@ import { Footer } from '../components/Footer'
 import { comingSoon } from '../components/Toast'
 
 export function CartPage() {
-  const { lines, setQty, remove, subtotalAgorot } = useCart()
+  const { lines, setQty, remove, subtotalAgorot, adjustments, dismissAdjustment } = useCart()
   const courierFlatAgorot = useDeliveryConfig(s => s.courierFlatAgorot)
   const freeAboveAgorot = useDeliveryConfig(s => s.freeAboveAgorot)
   const nav = useNavigate()
@@ -17,10 +17,35 @@ export function CartPage() {
   const toFree = Math.max(0, freeAboveAgorot - subtotal)
   const totalItems = lines.reduce((s, l) => s + l.quantity, 0)
 
+  // Inline notices for changes the server made (so the cart never mutates
+  // silently): removed lines surface as a banner, clamps as a per-line note.
+  const removed = adjustments.filter(a => a.type === 'REMOVED')
+  const clampByProduct = new Map(
+    adjustments.filter(a => a.type === 'CLAMPED').map(a => [a.productId, a]),
+  )
+  const removedBanner = removed.length > 0 && (
+    <div className="cls-cart-alerts">
+      {removed.map(a => (
+        <div key={a.productId} className="cls-cart-alert removed">
+          <span className="txt">{a.nameHe ?? 'פריט'} הוסר מהעגלה — אינו זמין במלאי</span>
+          <button
+            type="button"
+            className="dismiss"
+            onClick={() => dismissAdjustment(a.productId)}
+            aria-label="סגירת ההודעה"
+          >
+            <Icon name="x" size={14} stroke={2.2} />
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+
   if (lines.length === 0) {
     return (
       <>
         <div className="cls-page">
+          {removedBanner}
           <div className="cls-empty">
             <div className="ico-circle"><Icon name="bag" size={30} /></div>
             <h1>הסל ריק</h1>
@@ -54,9 +79,14 @@ export function CartPage() {
               </div>
             </div>
 
+            {removedBanner}
+
             <div style={{ display: 'grid', gap: 10 }}>
-              {lines.map(line => (
-                <div key={line.productId} className="cls-cart-line">
+              {lines.map(line => {
+                const clamp = clampByProduct.get(line.productId)
+                return (
+                <div key={line.productId} className="cls-cart-line-wrap">
+                <div className="cls-cart-line">
                   <div className="thumb">
                     {line.imageUrl ? (
                       <img src={line.imageUrl} alt={line.nameHe} />
@@ -102,7 +132,14 @@ export function CartPage() {
                     {formatPrice(line.priceAgorot * line.quantity)}
                   </div>
                 </div>
-              ))}
+                {clamp && (
+                  <div className="cls-cart-line-note">
+                    הכמות עודכנה ל-{clamp.finalQty} — זה המלאי שנותר
+                  </div>
+                )}
+                </div>
+                )
+              })}
             </div>
 
             {toFree > 0 && (

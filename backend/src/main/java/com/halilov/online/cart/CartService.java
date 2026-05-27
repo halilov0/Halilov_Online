@@ -31,28 +31,31 @@ public class CartService {
     }
 
     @Transactional(readOnly = true)
-    public List<CartDtos.CartLineView> getCart(String email) {
+    public CartDtos.CartResponse getCart(String email) {
         Long userId = requireUser(email).getId();
-        return resolve(cartLines.findByUserId(userId));
+        return resolveWithAdjustments(cartLines.findByUserId(userId));
     }
 
     /** Replace the user's cart wholesale — used for continuous sync and final
      *  logout flush. Lines for missing/inactive products or qty<=0 are dropped;
-     *  qty is clamped to current stock. */
+     *  qty is clamped to current stock. Returns the canonical cart plus any
+     *  clamps/removals so the client can tell the user instead of changing the
+     *  cart silently. */
     @Transactional
-    public List<CartDtos.CartLineView> replaceCart(String email, List<CartDtos.CartUpsertItem> incoming) {
+    public CartDtos.CartResponse replaceCart(String email, List<CartDtos.CartUpsertItem> incoming) {
         Long userId = requireUser(email).getId();
         Map<Long, Integer> desired = collapseByProduct(incoming);
         cartLines.deleteByUserId(userId);
         cartLines.flush();
-        persist(userId, desired);
-        return resolve(cartLines.findByUserId(userId));
+        List<CartDtos.CartAdjustment> adjustments = persist(userId, desired);
+        return new CartDtos.CartResponse(resolve(cartLines.findByUserId(userId)), adjustments);
     }
 
     /** Merge incoming lines with the existing DB cart — duplicate productIds sum,
-     *  total per line is clamped to stock and MAX_QTY_PER_LINE. */
+     *  total per line is clamped to stock and MAX_QTY_PER_LINE. Returns the
+     *  canonical cart plus any clamps/removals. */
     @Transactional
-    public List<CartDtos.CartLineView> mergeCart(String email, List<CartDtos.CartUpsertItem> incoming) {
+    public CartDtos.CartResponse mergeCart(String email, List<CartDtos.CartUpsertItem> incoming) {
         Long userId = requireUser(email).getId();
         Map<Long, Integer> sum = new HashMap<>();
         for (CartLine existing : cartLines.findByUserId(userId)) {
@@ -63,8 +66,8 @@ public class CartService {
         }
         cartLines.deleteByUserId(userId);
         cartLines.flush();
-        persist(userId, sum);
-        return resolve(cartLines.findByUserId(userId));
+        List<CartDtos.CartAdjustment> adjustments = persist(userId, sum);
+        return new CartDtos.CartResponse(resolve(cartLines.findByUserId(userId)), adjustments);
     }
 
     @Transactional
@@ -75,21 +78,42 @@ public class CartService {
 
     // ---------- helpers ----------
 
-    private void persist(Long userId, Map<Long, Integer> desired) {
-        if (desired.isEmpty()) return;
+    /** Persist the desired quantities, dropping/clamping against the catalog,
+     *  and report every change so the client can surface it. */
+    private List<CartDtos.CartAdjustment> persist(Long userId, Map<Long, Integer> desired) {
+        if (desired.isEmpty()) return List.of();
         Map<Long, Product> byId = new HashMap<>();
         for (Product p : products.findAllById(desired.keySet())) {
             byId.put(p.getId(), p);
         }
+        List<CartDtos.CartAdjustment> adjustments = new ArrayList<>();
         for (Map.Entry<Long, Integer> e : desired.entrySet()) {
+            int requested = e.getValue();
             Product p = byId.get(e.getKey());
-            if (p == null || !p.isActive()) continue;
-            int qty = Math.min(MAX_QTY_PER_LINE, Math.min(p.getStockQty(), e.getValue()));
-            if (qty <= 0) continue;
+            if (p == null) {
+                adjustments.add(removed(e.getKey(), null, requested));
+                continue;
+            }
+            if (!p.isActive()) {
+                adjustments.add(removed(p.getId(), p.getNameHe(), requested));
+                continue;
+            }
+            int qty = Math.min(MAX_QTY_PER_LINE, Math.min(p.getStockQty(), requested));
+            if (qty <= 0) {
+                adjustments.add(removed(p.getId(), p.getNameHe(), requested));
+                continue;
+            }
+            if (qty < requested) {
+                adjustments.add(new CartDtos.CartAdjustment(
+                    p.getId(), p.getNameHe(), CartDtos.AdjustmentType.CLAMPED, requested, qty));
+            }
             cartLines.save(new CartLine(userId, p.getId(), qty));
         }
+        return adjustments;
     }
 
+    /** View of the stored rows, dropping inactive/missing products silently —
+     *  used after a persist (which already reported the drops). */
     private List<CartDtos.CartLineView> resolve(List<CartLine> rows) {
         if (rows.isEmpty()) return List.of();
         Map<Long, Integer> qtyByProduct = new HashMap<>();
@@ -102,6 +126,40 @@ public class CartService {
             out.add(CartDtos.CartLineView.from(p, q));
         }
         return out;
+    }
+
+    /** Like {@link #resolve} but also reports which stored lines were dropped
+     *  (product gone inactive/deleted since they were added), so a plain read —
+     *  e.g. the focus refresh — can tell the user why a line disappeared. No
+     *  clamping here: a read never changes stored quantities. The dead row is
+     *  left in place; the next write prunes it. */
+    private CartDtos.CartResponse resolveWithAdjustments(List<CartLine> rows) {
+        if (rows.isEmpty()) return CartDtos.CartResponse.of(List.of());
+        Map<Long, Integer> qtyByProduct = new HashMap<>();
+        for (CartLine r : rows) qtyByProduct.put(r.getProductId(), r.getQuantity());
+        Map<Long, Product> byId = new HashMap<>();
+        for (Product p : products.findAllById(qtyByProduct.keySet())) {
+            byId.put(p.getId(), p);
+        }
+        List<CartDtos.CartLineView> out = new ArrayList<>(rows.size());
+        List<CartDtos.CartAdjustment> adjustments = new ArrayList<>();
+        for (Map.Entry<Long, Integer> e : qtyByProduct.entrySet()) {
+            int q = e.getValue();
+            Product p = byId.get(e.getKey());
+            if (p == null) {
+                adjustments.add(removed(e.getKey(), null, q));
+            } else if (!p.isActive()) {
+                adjustments.add(removed(p.getId(), p.getNameHe(), q));
+            } else if (q > 0) {
+                out.add(CartDtos.CartLineView.from(p, q));
+            }
+        }
+        return new CartDtos.CartResponse(out, adjustments);
+    }
+
+    private static CartDtos.CartAdjustment removed(Long productId, String nameHe, int requested) {
+        return new CartDtos.CartAdjustment(
+            productId, nameHe, CartDtos.AdjustmentType.REMOVED, requested, 0);
     }
 
     private static Map<Long, Integer> collapseByProduct(List<CartDtos.CartUpsertItem> items) {
