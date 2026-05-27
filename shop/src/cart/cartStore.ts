@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import {
   api, ApiError, getToken,
-  type CartLineView, type CartReplaceRequest, type Product,
+  type CartLineView, type CartReplaceRequest, type CartUpsertItem, type Product,
 } from '../api'
 
 /**
@@ -22,6 +22,19 @@ import {
  */
 
 const STORAGE_KEY = 'halilov.cart'
+// Records which signed-in user the persisted cart belongs to. Lets login
+// reconciliation tell a genuine guest cart (fold into the account) apart from
+// the residue of an expired session — whose cart already lives on the server,
+// so merging it would sum the local copy into its own source and double every
+// line. Survives a silent token expiry because it's a separate key the auth
+// logout path clears explicitly.
+const OWNER_KEY = 'halilov.cart.owner'
+// Snapshot (productId → quantity) of the cart the last time it provably matched
+// the server. Lets login reconciliation merge only what changed *since* that
+// point: residue already in the DB isn't re-summed (no doubling), while items
+// added during a logged-out window (token expired but not yet re-logged-in)
+// aren't in the baseline, so they still get folded in (no silent loss).
+const BASELINE_KEY = 'halilov.cart.baseline'
 const BROADCAST_CHANNEL = 'halilov.cart'
 // Coalesce rapid +/- clicks into a single PUT to avoid spamming the backend.
 const PUSH_DEBOUNCE_MS = 350
@@ -46,8 +59,13 @@ type CartState = {
   clearAll: () => Promise<void>
   /** Pull canonical cart from the server (call on App mount with valid token). */
   loadFromRemote: () => Promise<void>
-  /** Merge local lines into the server cart and adopt the merged result. */
-  mergeWithRemote: () => Promise<void>
+  /** Merge items into the server cart and adopt the result. Defaults to the
+   *  whole local cart; pass a subset to merge only those lines. */
+  mergeWithRemote: (items?: CartUpsertItem[]) => Promise<void>
+  /** Merge only the lines added/increased since the cart last matched the
+   *  server. Avoids re-summing residue already in the DB while still folding
+   *  in items added during a logged-out window. */
+  mergeAdditionsWithRemote: () => Promise<void>
   /** Best-effort flush of current local state to the server. */
   pushToRemote: () => Promise<void>
   totalItems: () => number
@@ -75,6 +93,61 @@ function load(): CartLine[] {
 
 function save(lines: CartLine[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(lines))
+}
+
+/** userId the persisted cart is synced with, or null for a guest cart. */
+export function getCartOwner(): number | null {
+  const raw = localStorage.getItem(OWNER_KEY)
+  if (!raw) return null
+  const n = Number(raw)
+  return Number.isInteger(n) ? n : null
+}
+
+/** Tag the persisted cart as owned by `userId`, or clear the tag (null). */
+export function setCartOwner(userId: number | null) {
+  if (userId == null) localStorage.removeItem(OWNER_KEY)
+  else localStorage.setItem(OWNER_KEY, String(userId))
+}
+
+/** Last server-confirmed cart as a productId → quantity map (empty if none). */
+function getBaseline(): Record<number, number> {
+  try {
+    const raw = localStorage.getItem(BASELINE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed as Record<number, number> : {}
+  } catch {
+    return {}
+  }
+}
+
+/** Record the current lines as the server-confirmed baseline. */
+function setBaseline(lines: CartLine[]) {
+  const map: Record<number, number> = {}
+  for (const l of lines) map[l.productId] = l.quantity
+  localStorage.setItem(BASELINE_KEY, JSON.stringify(map))
+}
+
+/** Drop the baseline (logout — the next session starts with no history). */
+export function clearCartBaseline() {
+  localStorage.removeItem(BASELINE_KEY)
+}
+
+/**
+ * Lines added or increased since the cart last matched the server, as merge
+ * items. New products and quantity bumps yield a positive delta; removals and
+ * decrements are omitted (we never push a removal through /merge, so the DB
+ * keeps the line — losing an item is worse than keeping a stale one). For a
+ * guest cart the baseline is empty, so every line is returned.
+ */
+function additionsSinceBaseline(lines: CartLine[]): CartUpsertItem[] {
+  const base = getBaseline()
+  const out: CartUpsertItem[] = []
+  for (const l of lines) {
+    const diff = l.quantity - (base[l.productId] ?? 0)
+    if (diff > 0) out.push({ productId: l.productId, quantity: diff })
+  }
+  return out
 }
 
 function toCartLine(v: CartLineView): CartLine {
@@ -184,6 +257,7 @@ export const useCart = create<CartState>((set, get) => ({
     if (!getToken()) return
     try {
       await api('/api/cart', { method: 'DELETE' })
+      setBaseline([]) // server cart is now empty — keep the baseline in step
     } catch {
       // ignore — local is the user-visible truth, server will catch up next push
     }
@@ -197,15 +271,16 @@ export const useCart = create<CartState>((set, get) => ({
       save(lines)
       set({ lines })
       broadcastUpdate(lines)
+      setBaseline(lines) // adopted the server cart verbatim — it's now the baseline
     } catch {
       // leave local intact on failure
     }
   },
 
-  async mergeWithRemote() {
+  async mergeWithRemote(items) {
     if (!getToken()) return
-    const items = get().lines.map(l => ({ productId: l.productId, quantity: l.quantity }))
-    const body: CartReplaceRequest = { items }
+    const payload = items ?? get().lines.map(l => ({ productId: l.productId, quantity: l.quantity }))
+    const body: CartReplaceRequest = { items: payload }
     try {
       const merged = await api<CartLineView[]>('/api/cart/merge', {
         method: 'POST',
@@ -215,20 +290,27 @@ export const useCart = create<CartState>((set, get) => ({
       save(lines)
       set({ lines })
       broadcastUpdate(lines)
+      setBaseline(lines) // server returned the canonical merged cart
     } catch {
       // ignore — keep local cart as-is
     }
   },
 
+  async mergeAdditionsWithRemote() {
+    return get().mergeWithRemote(additionsSinceBaseline(get().lines))
+  },
+
   async pushToRemote() {
     if (!getToken()) return
-    const items = get().lines.map(l => ({ productId: l.productId, quantity: l.quantity }))
+    const snapshot = get().lines
+    const items = snapshot.map(l => ({ productId: l.productId, quantity: l.quantity }))
     const body: CartReplaceRequest = { items }
     try {
       await api('/api/cart', {
         method: 'PUT',
         body: JSON.stringify(body),
       })
+      setBaseline(snapshot) // server now holds exactly what we just pushed
     } catch (e) {
       // 401/403: token died — caller (authStore) handles auth state, keep cart.
       // 5xx/network: transient, next mutation will retry via debounce.

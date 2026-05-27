@@ -73,8 +73,20 @@ ever echoing the actual owner's email.
 - **Cross-device**: `visibilitychange` on the document refetches the
   canonical cart when a tab returns to foreground (throttled to 3 s).
 - Guests have no `cart_lines` row; the cart is entirely in
-  `localStorage`. On login, `mergeWithRemote()` POSTs the local cart to
-  `/api/cart/merge` and adopts the merged result.
+  `localStorage`, tagged once signed in with its owner userId
+  (`halilov.cart.owner`) and a baseline (`halilov.cart.baseline`) — the
+  last cart that provably matched the server, refreshed on every
+  load/merge/push. On login `adoptAuth` reconciles by these:
+  - **owner == another user** → drop the local cart, then
+    `loadFromRemote()`.
+  - **otherwise** → `mergeAdditionsWithRemote()` merges only the lines
+    added/increased since the baseline via `POST /api/cart/merge`. A true
+    guest cart has an empty baseline so it folds in whole; an
+    expired-session residue contributes only items added while logged
+    out, so lines already in the DB aren't re-summed (no doubling) and
+    nothing added in the meantime is lost.
+- Full behavior reference (sync, reconciliation table, scenarios, edges):
+  [../CART.md](../CART.md).
 
 ## Guest checkout & order share links
 

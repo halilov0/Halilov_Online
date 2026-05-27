@@ -160,8 +160,17 @@ The client treats the server as the source of truth and uses:
 - **`visibilitychange` refetch** to pick up cross-device changes when a
   tab returns to foreground.
 
-Guests keep the cart entirely in `localStorage`. On login the local cart
-is merged into the server cart.
+Guests keep the cart entirely in `localStorage`, tagged with an owner
+userId and a *baseline* (the last cart that provably matched the server)
+once signed in. On login the cart is reconciled by that tag: a leftover
+cart belonging to a different user is dropped, otherwise login merges
+only the lines **added since the baseline**. A genuine guest cart has an
+empty baseline, so it folds in whole; the residue of an expired session
+contributes only items added during the logged-out window — its lines
+already in the DB are skipped, so the cart never doubles.
+
+See [CART.md](CART.md) for the full cart behavior: storage keys, sync,
+the login reconciliation table, worked scenarios, and deliberate edges.
 
 ### 3.4 Money & taxes
 
