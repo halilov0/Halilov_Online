@@ -5,6 +5,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * Customer-facing catalog reads — list categories, browse + search
+ * products, fetch product detail. Open without authentication and
+ * cache-friendly.
+ */
 @RestController
 public class CatalogPublicController {
 

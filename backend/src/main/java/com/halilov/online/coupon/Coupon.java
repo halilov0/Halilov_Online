@@ -4,6 +4,17 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 
+/**
+ * The {@code coupons} table.
+ *
+ * <p>{@code value} is interpreted by {@link CouponType}: whole
+ * percent for {@code PERCENT}, integer agorot for {@code FIXED}.
+ * Optional {@code min_subtotal_agorot}, {@code max_uses}, and
+ * {@code active_from}/{@code active_until} gate eligibility.
+ * {@code usage_count} is mutated by
+ * {@link com.halilov.online.order.OrderService} in lockstep with
+ * order state transitions, never by the admin UI.
+ */
 @Entity
 @Table(name = "coupons")
 public class Coupon {

@@ -10,6 +10,13 @@ import com.halilov.online.common.InMemoryThrottle;
 
 import java.time.Duration;
 
+/**
+ * Public "notify me when back in stock" sign-up. Hung off
+ * {@code /api/products/{id}/stock-notify} so the URL surface stays
+ * grouped with the product. Throttled per-IP <em>and</em> per-email so
+ * neither a single source nor a targeted-victim email can be enrolled
+ * to a flood of products that would fan out emails on the next restock.
+ */
 @RestController
 @RequestMapping("/api/products")
 public class StockNotificationController {

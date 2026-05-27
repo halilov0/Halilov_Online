@@ -4,6 +4,23 @@ import {
   type CartLineView, type CartReplaceRequest, type Product,
 } from '../api'
 
+/**
+ * Shop cart store. Server-backed for signed-in users, localStorage-only
+ * for guests.
+ *
+ * Mutations are optimistic on the local lines and debounced into a
+ * single `PUT /api/cart` (350 ms). Cross-tab updates fan out via
+ * `BroadcastChannel` (with a `storage`-event fallback). On tab
+ * visibility change the canonical cart is refetched, throttled, so a
+ * mutation on another device propagates within a few seconds of the
+ * user returning.
+ *
+ * Failure handling: 401/403 don't touch the cart (the auth store
+ * deals with it). 5xx and network errors retry on the next mutation.
+ * Other 4xx mean the optimistic local state diverged from what the
+ * server will accept — we roll back by adopting the canonical cart.
+ */
+
 const STORAGE_KEY = 'halilov.cart'
 const BROADCAST_CHANNEL = 'halilov.cart'
 // Coalesce rapid +/- clicks into a single PUT to avoid spamming the backend.

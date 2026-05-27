@@ -23,6 +23,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+/**
+ * Aggregates the small set of counters surfaced on the admin
+ * dashboard: today's orders, today's revenue, low-stock products,
+ * recent signups, top sellers. All times are computed in
+ * {@code Asia/Jerusalem} so "today" matches the operator's calendar.
+ *
+ * <p>Intentionally narrow — anything that wants real time-series
+ * granularity belongs in a metrics pipeline, not here.
+ */
 import java.util.TreeMap;
 
 /**

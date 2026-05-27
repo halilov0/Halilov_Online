@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
+/**
+ * Notice-only cookie banner. We only use essential storage today (auth
+ * token, cart, guest order tokens, favorites) — no analytics, no
+ * third-party pixels — so this is informational, not consent-gated.
+ * If/when tracking is introduced, swap this for a category-based
+ * consent UI before any non-essential cookie is set.
+ */
 const STORAGE_KEY = 'halilov_cookie_consent_v1'
 
 function readConsent(): boolean {

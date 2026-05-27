@@ -9,6 +9,22 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+/**
+ * Payment initiation and the mock-provider completion hook.
+ *
+ * <p>Two routes:
+ * <ul>
+ *   <li>{@code POST /api/orders/{n}/pay} — start a checkout. Returns
+ *       the redirect URL the SPA should send the user to.</li>
+ *   <li>{@code POST /api/payments/mock/{n}/complete} — the mock-only
+ *       completion callback that flips an order to {@code PAID}. A real
+ *       PSP integration replaces this with a signed webhook.</li>
+ * </ul>
+ *
+ * <p>Both accept either an authenticated bearer token or an
+ * {@code X-Guest-Token} header. Anonymous calls without a valid token
+ * get {@code 401}.
+ */
 @RestController
 public class PaymentController {
 

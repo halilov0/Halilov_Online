@@ -3,6 +3,11 @@ package com.halilov.online.marketing;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+/**
+ * Request and response records for the marketing admin endpoints.
+ * {@code BroadcastRequest.htmlBody} is admin-typed HTML; jsoup
+ * sanitises it inside {@link MarketingService} before persistence.
+ */
 public class MarketingDtos {
 
     public record RecipientCount(long eligibleCount) {}

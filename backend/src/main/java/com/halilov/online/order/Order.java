@@ -6,6 +6,20 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * The {@code orders} table. Each row owns its line items
+ * ({@link OrderItem}) via cascade.
+ *
+ * <p>Money lives entirely in integer agorot. Address is stored by
+ * {@code shipping_address_id} pointing at a snapshot row in
+ * {@code addresses} — orders never reach back into
+ * {@code saved_addresses} so a future profile edit can't rewrite a
+ * shipped invoice. {@code guest_token} is set at create time for
+ * guest checkout; {@code share_token} is minted on demand by the
+ * owner for accountant-style share links. {@code force_logout_at},
+ * cancel/refund timestamps and reason fields support the post-pay
+ * lifecycle.
+ */
 @Entity
 @Table(name = "orders")
 public class Order {

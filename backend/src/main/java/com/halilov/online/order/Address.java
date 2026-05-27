@@ -3,6 +3,12 @@ package com.halilov.online.order;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+/**
+ * Shipping address snapshot taken at checkout. Bound to an order via
+ * {@code orders.shipping_address_id}. Deliberately separate from
+ * {@link com.halilov.online.user.SavedAddress} — orders carry a
+ * frozen copy so later profile edits cannot rewrite a shipped invoice.
+ */
 @Entity
 @Table(name = "addresses")
 public class Address {

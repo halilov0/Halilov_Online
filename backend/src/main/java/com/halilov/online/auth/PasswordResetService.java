@@ -24,6 +24,25 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Self-service password reset.
+ *
+ * <p>Two-step:
+ * <ol>
+ *   <li>{@link #requestForEmail} — generates a single-use token,
+ *       persists it ({@link PasswordResetToken}) with a 1-hour TTL, and
+ *       emails the user a {@code /reset?t=...} link. Always silent on
+ *       unknown emails — the caller-facing endpoint returns 204
+ *       regardless to prevent enumeration.</li>
+ *   <li>{@link #complete} — validates the token, rotates the password
+ *       hash, marks the token consumed, and stamps
+ *       {@code force_logout_at} so any other open sessions for this
+ *       user fail on their next request.</li>
+ * </ol>
+ *
+ * <p>Tokens are 256 bits of {@link java.security.SecureRandom} so
+ * brute-forcing the URL space is not a meaningful threat.
+ */
 @Service
 public class PasswordResetService {
 

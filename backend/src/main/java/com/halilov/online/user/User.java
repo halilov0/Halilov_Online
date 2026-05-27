@@ -3,6 +3,20 @@ package com.halilov.online.user;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+/**
+ * The {@code users} table — single identity for both customers and
+ * admins.
+ *
+ * <p>Beyond profile fields, this row owns a fair amount of security
+ * state: bcrypt {@code password_hash}, {@code enabled} (admin can
+ * disable an account), {@code failed_login_count} +
+ * {@code locked_until} (5-strike auto-lockout in {@link com.halilov.online.auth.AuthService}),
+ * {@code force_logout_at} (the cut-off the auth filter compares JWT
+ * {@code iat} against), {@code totp_secret} + {@code totp_enabled}
+ * (admin 2FA), and marketing-consent columns
+ * ({@code marketing_opt_in}, {@code marketing_consent_at},
+ * {@code unsubscribe_token}).
+ */
 @Entity
 @Table(name = "users")
 public class User {

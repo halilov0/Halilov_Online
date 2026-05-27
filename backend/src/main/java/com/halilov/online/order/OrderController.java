@@ -8,6 +8,16 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
+/**
+ * Customer + guest order endpoints under {@code /api/orders}.
+ *
+ * <p>{@code POST /} accepts both authenticated and anonymous callers —
+ * a guest order is created with a one-time {@code guest_token} returned
+ * in the response. {@code GET /{orderNumber}} accepts either an
+ * {@code Authorization} bearer (owner read) or an {@code X-Guest-Token}
+ * header (guest / share-link read). Wrong-account access returns
+ * {@code 403}, not {@code 404}.
+ */
 @RestController
 @RequestMapping("/api/orders")
 public class OrderController {

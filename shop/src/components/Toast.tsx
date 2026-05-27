@@ -1,5 +1,11 @@
 import { create } from 'zustand'
 
+/**
+ * Toast queue. {@link useToast.push} enqueues a string that auto-clears
+ * after 2.4 s. The container component (mounted near the app root)
+ * renders the current entries. Deliberately minimal — no per-toast
+ * type / severity until something actually needs to distinguish them.
+ */
 type ToastEntry = { id: number; text: string }
 
 type ToastState = {

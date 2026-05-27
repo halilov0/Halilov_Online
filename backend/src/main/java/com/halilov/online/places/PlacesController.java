@@ -4,6 +4,12 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * IL postal lookup under {@code /api/places}. Backs the city + street
+ * autocomplete on the checkout shipping form. Inputs are prefix-matched
+ * against the locality dataset and capped at 2,000 results to bound
+ * response size; the SPA only renders the top 10–20 anyway.
+ */
 @RestController
 @RequestMapping("/api/places")
 public class PlacesController {

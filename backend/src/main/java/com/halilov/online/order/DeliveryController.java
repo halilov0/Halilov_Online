@@ -5,6 +5,16 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Public delivery pricing — lets the SPA quote shipping without
+ * creating an order first.
+ *
+ * <p>{@code GET /quote?subtotalAgorot=...} returns the available
+ * delivery options and the resolved price (including the
+ * "free above {@code N}" cutoff). {@code GET /config} exposes the raw
+ * configuration so the cart can mirror it client-side — the backend
+ * stays the single source of truth for delivery rules.
+ */
 @RestController
 @RequestMapping("/api/delivery")
 public class DeliveryController {

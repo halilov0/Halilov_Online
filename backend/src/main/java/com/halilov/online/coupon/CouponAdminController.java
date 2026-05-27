@@ -9,6 +9,12 @@ import com.halilov.online.audit.AuditService;
 
 import java.util.List;
 
+/**
+ * Admin coupon CRUD under {@code /api/admin/coupons}. Create, update,
+ * deactivate; the usage counter is mutated by
+ * {@link com.halilov.online.order.OrderService} on order state changes,
+ * not here.
+ */
 @RestController
 @RequestMapping("/api/admin/coupons")
 public class CouponAdminController {

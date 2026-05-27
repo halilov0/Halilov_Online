@@ -4,6 +4,12 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 
+/**
+ * "Notify me when this is back in stock" sign-up. Rows are inserted
+ * by {@link StockNotificationService#subscribe} and consumed (one-shot
+ * — {@code notified_at} stamped) when the product's stock transitions
+ * from zero to positive.
+ */
 @Entity
 @Table(name = "stock_notifications")
 public class StockNotification {

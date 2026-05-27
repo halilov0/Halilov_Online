@@ -10,6 +10,12 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 
+/**
+ * Admin image upload under {@code /api/admin/media}. Hands each file to
+ * {@link ImageProcessor} for resize / re-encode, then to the active
+ * {@link MediaStorage} (local disk or Cloudflare R2) and returns the
+ * canonical URL the caller should persist on the product.
+ */
 @RestController
 @RequestMapping("/api/admin/media")
 public class MediaAdminController {

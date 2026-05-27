@@ -5,6 +5,11 @@ import jakarta.validation.constraints.*;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * Request and response records for the catalog controllers.
+ * {@code *.from(entity)} helpers project entities into the
+ * client-facing view shape.
+ */
 public class CatalogDtos {
 
     public record CategoryView(Long id, String slug, String nameHe, Long parentId, int sortOrder) {

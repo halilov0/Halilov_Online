@@ -13,6 +13,22 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import com.halilov.online.user.UserRepository;
 
+/**
+ * Append-only audit writer. Every security-sensitive and order-state
+ * action goes through one of the {@code record*} methods, which insert
+ * one row into {@code audit_log} in a {@code REQUIRES_NEW} transaction.
+ *
+ * <p>The new transaction is structural — an audit insert failure can
+ * never roll back the caller's work, and a caller's rollback can never
+ * lose the audit entry. That last property is what lets us audit failed
+ * logins from inside the auth path that ultimately throws 401.
+ *
+ * <p>{@link #record} resolves the actor from
+ * {@link org.springframework.security.core.context.SecurityContextHolder}
+ * and the IP from the current servlet request. Use
+ * {@link #recordAs} when no security context is available yet — e.g.
+ * during register / pre-auth login.
+ */
 @Service
 public class AuditService {
 

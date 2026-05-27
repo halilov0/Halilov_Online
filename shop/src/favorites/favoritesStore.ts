@@ -1,5 +1,13 @@
 import { create } from 'zustand'
 
+/**
+ * Favorites store. Pure-client, `localStorage`-only — no server
+ * round-trip. Just a set of product IDs the user has hearted, with the
+ * usual `has` / `toggle` / `remove` shape. Survives reload but not
+ * across browsers; favorites graduate to the server only if a real
+ * "wishlist" feature lands.
+ */
+
 const STORAGE_KEY = 'halilov.favorites'
 
 type FavoritesState = {

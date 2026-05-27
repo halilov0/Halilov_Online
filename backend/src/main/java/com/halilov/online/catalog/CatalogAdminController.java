@@ -14,6 +14,12 @@ import com.halilov.online.audit.AuditService;
 import java.io.IOException;
 import java.time.LocalDate;
 
+/**
+ * Admin catalog management under {@code /api/admin/catalog}: category
+ * CRUD, product CRUD, image upload, stock adjustments, and a CSV
+ * export. Audit-trails every mutating call via
+ * {@link com.halilov.online.audit.AuditService}.
+ */
 @RestController
 @RequestMapping("/api/admin/catalog")
 public class CatalogAdminController {

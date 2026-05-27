@@ -9,6 +9,12 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+/**
+ * Serves {@code /sitemap.xml} for Google Search Console + other
+ * crawlers. The static SPA routes plus every active product slug, with
+ * {@code <lastmod>} for products so re-crawls pick up edits. Cached for
+ * one hour at the edge.
+ */
 @RestController
 public class SitemapController {
 

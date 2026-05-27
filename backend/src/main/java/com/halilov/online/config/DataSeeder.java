@@ -14,6 +14,12 @@ import com.halilov.online.user.Role;
 import com.halilov.online.user.User;
 import com.halilov.online.user.UserRepository;
 
+/**
+ * Idempotent first-boot seeding. Inserts an initial admin user from
+ * {@code INIT_ADMIN_*} env vars (so a fresh deploy has a way in), and
+ * the dev-time category/product fixtures. Safe to leave enabled in
+ * prod — every step is conditional on absence.
+ */
 @Configuration
 class DataSeeder {
 

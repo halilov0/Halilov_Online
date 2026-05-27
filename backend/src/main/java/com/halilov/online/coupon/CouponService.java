@@ -9,6 +9,18 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Coupon validation, application, and admin CRUD.
+ *
+ * <p>{@link #resolveForOrder} is the single hot-path entry point used
+ * by the checkout — it normalises the code, checks the active window
+ * and the minimum subtotal, computes the discount in agorot, and
+ * returns an immutable {@code AppliedCoupon} snapshot. The
+ * complementary {@link #incrementUsage} / {@link #decrementUsage} move
+ * the usage counter on {@code PENDING → PAID} and on cancel/refund
+ * respectively — kept in lockstep with the order state by
+ * {@link com.halilov.online.order.OrderService}.
+ */
 @Service
 public class CouponService {
 

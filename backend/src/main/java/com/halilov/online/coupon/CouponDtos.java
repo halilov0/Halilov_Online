@@ -4,6 +4,11 @@ import jakarta.validation.constraints.*;
 
 import java.time.Instant;
 
+/**
+ * Request and response records for coupon endpoints — admin upsert
+ * shape, list view, and the {@code /validate} preview returned to the
+ * cart.
+ */
 public class CouponDtos {
 
     public record CouponUpsert(

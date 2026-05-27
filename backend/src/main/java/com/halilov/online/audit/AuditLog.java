@@ -4,6 +4,13 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 
+/**
+ * One row in the append-only {@code audit_log} table. Records who
+ * (actor user id + role + email + IP), what
+ * ({@link AuditAction} string), against what entity, with optional
+ * human-readable message and JSON metadata. Snapshotted hourly to
+ * Cloudflare R2 for off-host tamper-evidence.
+ */
 @Entity
 @Table(name = "audit_log")
 public class AuditLog {

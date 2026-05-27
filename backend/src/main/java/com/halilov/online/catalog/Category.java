@@ -3,6 +3,12 @@ package com.halilov.online.catalog;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+/**
+ * The {@code categories} table. {@code parent_id} is nullable — a
+ * shallow two-level hierarchy is enough for the current shop, but the
+ * column accepts deeper nesting if it's ever needed. {@code slug}
+ * drives the public {@code /c/{slug}} URL.
+ */
 @Entity
 @Table(name = "categories")
 public class Category {

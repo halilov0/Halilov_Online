@@ -8,6 +8,12 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
+/**
+ * Logged-in user self-service under {@code /api/me}. Profile edits,
+ * password change, saved-address CRUD, and the marketing opt-in
+ * toggle. All routes require a valid bearer token; the email is taken
+ * from the JWT, never the request body.
+ */
 @RestController
 @RequestMapping("/api/me")
 public class AccountController {

@@ -21,6 +21,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Catalog reads + admin CRUD for products and categories. Wraps the
+ * two repositories so the controllers stay thin (mapping +
+ * authorization only) and the rules — slug normalisation, image-URL
+ * array maintenance, active filtering, restock-notification fan-out —
+ * live in one place.
+ *
+ * <p>When a product transitions {@code stockQty 0 → >0} the service
+ * fires {@link StockNotificationService#triggerForProduct} so anyone
+ * waiting on a "notify me" sign-up gets a one-shot email.
+ */
 @Service
 public class CatalogService {
 

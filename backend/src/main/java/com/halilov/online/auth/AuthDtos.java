@@ -4,6 +4,11 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+/**
+ * Request and response records for {@link AuthController}. Bean
+ * Validation annotations enforce input shape at the HTTP boundary;
+ * the service layer trusts what arrives.
+ */
 public class AuthDtos {
 
     public record RegisterRequest(

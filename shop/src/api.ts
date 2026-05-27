@@ -1,10 +1,26 @@
+/**
+ * Shop SPA HTTP wrapper and shared types.
+ *
+ * - {@link api} attaches the JWT (when present) and the order-scoped
+ *   guest token (when applicable) to every fetch.
+ * - Bearer token lives in `localStorage` so it survives reload.
+ * - Guest order tokens live in `sessionStorage` so they vanish when
+ *   the tab closes — durable persistence is for real accounts.
+ *
+ * Every backend error is normalised into an {@link ApiError} carrying
+ * the HTTP status; UI code maps status → Hebrew copy via
+ * {@link extractErrorMessage}.
+ */
+
 const TOKEN_KEY = 'halilov.token'
 const GUEST_ORDERS_KEY = 'halilov.guestOrders'
 
+/** Returns the persisted bearer JWT, or `null` if the user is anonymous. */
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
 }
 
+/** Persists or clears the bearer JWT in `localStorage`. */
 export function setToken(token: string | null) {
   if (token) localStorage.setItem(TOKEN_KEY, token)
   else localStorage.removeItem(TOKEN_KEY)
@@ -24,10 +40,16 @@ function readGuestOrders(): GuestOrderMap {
   }
 }
 
+/** Look up the guest token previously returned for an order. */
 export function getGuestOrderToken(orderNumber: string): string | null {
   return readGuestOrders()[orderNumber] ?? null
 }
 
+/**
+ * Stash the guest token returned at order creation under its order
+ * number, so subsequent reads / payment calls can present it via the
+ * `X-Guest-Token` header.
+ */
 export function rememberGuestOrder(orderNumber: string, token: string) {
   const map = readGuestOrders()
   map[orderNumber] = token
@@ -45,6 +67,10 @@ function guestTokenForPath(path: string): string | null {
   return null
 }
 
+/** Error thrown by {@link api} on any non-2xx response. The `status`
+ *  field is the canonical HTTP status — callers branch on it to map
+ *  e.g. `403` to a "wrong account" hint without leaking the owner's
+ *  email. */
 export class ApiError extends Error {
   status: number
   constructor(message: string, status: number) {
@@ -53,6 +79,18 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Typed `fetch` wrapper.
+ *
+ * - Sets `Content-Type: application/json` automatically when a body is
+ *   supplied without one.
+ * - Attaches `Authorization: Bearer ...` when a token is present.
+ * - When anonymous, auto-attaches `X-Guest-Token` for order paths that
+ *   match a remembered guest order (no caller plumbing required).
+ * - Throws {@link ApiError} (with status + message) on non-2xx.
+ *
+ * @typeParam T - Expected JSON response shape.
+ */
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
   if (init.body && !headers.has('Content-Type')) {
@@ -171,6 +209,7 @@ export type ProfileUpdate = {
   phone?: string
 }
 
+/** Format integer agorot as a Hebrew-style price string (`₪123.45`). */
 export function formatPrice(agorot: number): string {
   return `₪${(agorot / 100).toFixed(2)}`
 }
@@ -267,6 +306,10 @@ export type OrderView = {
   guestToken: string | null
 }
 
+/**
+ * Mirror of the backend self-cancel rule. A customer can cancel before
+ * the parcel ships; after `SHIPPED` the customer must contact support.
+ */
 export function canCustomerCancel(status: OrderView['status']): boolean {
   return status === 'PENDING' || status === 'PAID' || status === 'FULFILLED'
 }

@@ -20,6 +20,26 @@ import org.springframework.http.HttpStatus;
 import java.time.Instant;
 import java.util.UUID;
 
+/**
+ * Core auth flows: register, login (with two-stage admin 2FA), and
+ * {@code /me}. JWT issuance is delegated to
+ * {@link com.halilov.online.security.JwtService}.
+ *
+ * <p>Login is the interesting part. Customer logins are single-stage —
+ * a successful password check returns a JWT immediately. Admin logins
+ * with TOTP enrolled return a JWT only when the request IP is trusted
+ * (see {@link com.halilov.online.auth.totp.TrustedIpService}); otherwise
+ * the response is a {@link LoginOutcome.ChallengeResponse}-bearing
+ * outcome and the client must follow up with
+ * {@link #completeTotpLogin}.
+ *
+ * <p>Per-account lockout (5 wrong passwords ⇒ 15 minutes locked) is
+ * enforced here. The lockout check runs <em>before</em> bcrypt so a
+ * hammering attacker burns no CPU while the account is cooling down.
+ * Lockout state is intentionally surfaced to the user — the real user
+ * already knows the account exists, and an attacker who's been
+ * incrementing the counter likewise knows it exists.
+ */
 @Service
 public class AuthService {
 

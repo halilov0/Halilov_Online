@@ -4,6 +4,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Shape returned by {@link MetricsAdminController} — KPIs +
+ * status histogram + daily revenue series + top products + low
+ * stock + recent orders. One round trip powers the admin home
+ * screen.
+ */
 public class MetricsDtos {
 
     public record DashboardMetrics(

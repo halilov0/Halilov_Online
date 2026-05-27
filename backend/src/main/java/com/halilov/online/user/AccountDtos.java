@@ -2,6 +2,10 @@ package com.halilov.online.user;
 
 import jakarta.validation.constraints.*;
 
+/**
+ * Request and response records for {@link AccountController} — profile
+ * updates, marketing-consent toggle, saved-address upsert and view.
+ */
 public class AccountDtos {
 
     public record ProfileUpdate(

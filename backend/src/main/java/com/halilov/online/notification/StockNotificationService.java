@@ -15,6 +15,19 @@ import java.time.Instant;
 import java.util.List;
 import java.util.regex.Pattern;
 
+/**
+ * Back-in-stock sign-up + notify.
+ *
+ * <p>{@link #subscribe} validates and stores a (product, email) row.
+ * When stock for a product goes from 0 back to positive,
+ * {@link com.halilov.online.catalog.CatalogService} calls
+ * {@code triggerForProduct} which dequeues pending sign-ups and hands
+ * one {@link EmailMessage} each to {@link EmailService} — the outbox
+ * absorbs Brevo rate-limits and retries on its own cadence.
+ *
+ * <p>Anti-abuse lives in {@link StockNotificationController}
+ * (per-IP + per-email throttle); this service trusts its inputs.
+ */
 @Service
 public class StockNotificationService {
 

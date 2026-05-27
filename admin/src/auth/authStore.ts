@@ -1,6 +1,26 @@
 import { create } from 'zustand'
 import { api, ApiError, setToken, getToken, type AuthResponse, type Me } from '../api'
 
+/**
+ * Admin auth store with a two-step login flow.
+ *
+ * Step 1: `login(email, password)` POSTs `/api/auth/login`. The
+ * response is either an `AuthResponse` (token issued — trusted IP,
+ * 2FA not required) or a `ChallengeResponse` (`{ requires2FA, challenge }`).
+ *
+ * Step 2 (when challenged): `submitTotp(code)` POSTs the challenge +
+ * code to `/api/auth/login/totp`. On success the resulting token is
+ * adopted exactly as in step 1.
+ *
+ * `bootstrapped` flips to `true` after the first `fetchMe()` resolves
+ * (success or fail). The `RequireAdmin` route guard reads this so it
+ * can distinguish "still hydrating" from "definitely not logged in"
+ * and avoid bouncing to /login on every F5.
+ *
+ * A non-ADMIN role returned by `/me` is treated as a logout — there's
+ * no customer UI in this app, and we don't want to keep a stale
+ * session around.
+ */
 type LoginStepResult = 'done' | 'totp-required'
 
 type ChallengeResponse = { requires2FA: true; challenge: string }

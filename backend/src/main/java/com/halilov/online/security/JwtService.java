@@ -13,6 +13,17 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
 
+/**
+ * HS256 JWT issue + parse. The secret comes from
+ * {@code app.jwt.secret} and must be at least 32 characters in any
+ * environment that's reachable from the public internet.
+ *
+ * <p>Tokens carry {@code sub} (email), {@code uid}, {@code role}, and
+ * timestamps. {@code iat} is truncated to whole seconds because the
+ * auth filter compares it against {@code users.force_logout_at} — a
+ * sub-second mismatch from the DB round-trip would otherwise let a
+ * just-issued token slip past a freshly-stamped force-logout.
+ */
 @Service
 public class JwtService {
 

@@ -4,6 +4,13 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 
+/**
+ * One queued email. {@link EmailService#send} writes the row before
+ * attempting delivery; a successful send flips it to {@code SENT},
+ * a transient failure leaves it {@code PENDING} with an incremented
+ * {@code attempts} counter for the retry sweep to pick up.
+ * Rate-limited / outage'd sends therefore never disappear.
+ */
 @Entity
 @Table(name = "email_outbox")
 public class EmailOutbox {

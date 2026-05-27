@@ -1,13 +1,25 @@
+/**
+ * Admin SPA HTTP wrapper and shared types.
+ *
+ * Mirrors the shop's `api.ts` but with an admin-scoped token key so
+ * shop login state and admin login state never collide on the same
+ * device. No guest-token plumbing — every admin endpoint requires a
+ * full bearer JWT.
+ */
 const TOKEN_KEY = 'halilov.admin.token'
 
+/** Returns the persisted admin JWT, or `null` if unauthenticated. */
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
 }
+/** Persists or clears the admin JWT in `localStorage`. */
 export function setToken(token: string | null) {
   if (token) localStorage.setItem(TOKEN_KEY, token)
   else localStorage.removeItem(TOKEN_KEY)
 }
 
+/** Error thrown by {@link api} / {@link downloadFile} on non-2xx
+ *  responses. The `status` field is the canonical HTTP status. */
 export class ApiError extends Error {
   status: number
   constructor(message: string, status: number) {
@@ -16,6 +28,12 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Authenticated file download. Used by the CSV export buttons —
+ * we cannot rely on a plain `<a href>` because the request needs the
+ * bearer token. Honours the server's `Content-Disposition` filename
+ * when present, otherwise falls back to `fallbackName`.
+ */
 export async function downloadFile(path: string, fallbackName: string): Promise<void> {
   const headers = new Headers()
   const token = getToken()
@@ -39,6 +57,14 @@ export async function downloadFile(path: string, fallbackName: string): Promise<
   URL.revokeObjectURL(url)
 }
 
+/**
+ * Typed `fetch` wrapper. Auto-injects the admin bearer token,
+ * `Content-Type: application/json` (unless the body is a `FormData`),
+ * and throws {@link ApiError} on non-2xx with a Hebrew error message
+ * resolved by {@link extractErrorMessage}.
+ *
+ * @typeParam T - Expected JSON response shape.
+ */
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
   const isFormData = init.body instanceof FormData

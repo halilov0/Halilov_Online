@@ -2,6 +2,12 @@ package com.halilov.online.order;
 
 import jakarta.persistence.*;
 
+/**
+ * One line on an {@link Order}. Snapshots the product name, SKU and
+ * unit price at order time so future catalog edits never rewrite a
+ * shipped invoice. {@code line_total_agorot} = unit price × quantity,
+ * stored directly to keep CSV exports and refund math simple.
+ */
 @Entity
 @Table(name = "order_items")
 public class OrderItem {

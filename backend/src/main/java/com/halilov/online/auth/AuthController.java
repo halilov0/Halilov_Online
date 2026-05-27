@@ -10,6 +10,15 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+/**
+ * Public authentication surface under {@code /api/auth}.
+ *
+ * <p>Hosts register, login (single-stage for customers, two-stage for
+ * admins with 2FA), {@code /me}, and the forgot-password / reset flow.
+ * All listed routes are explicitly {@code permitAll} in
+ * {@link com.halilov.online.config.SecurityConfig} — they predate the
+ * JWT being available on the client.
+ */
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {

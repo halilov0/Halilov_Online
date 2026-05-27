@@ -6,6 +6,13 @@ import jakarta.validation.constraints.*;
 import java.time.Instant;
 import java.util.List;
 
+/**
+ * Request and response records for {@link OrderController},
+ * {@link AdminOrderController}, and {@link DeliveryController}.
+ * {@code OrderView.from} adapts the persistence entities into the
+ * client-facing shape (snake_case timestamps as {@link Instant},
+ * money exposed in agorot).
+ */
 public class OrderDtos {
 
     public record OrderItemRequest(

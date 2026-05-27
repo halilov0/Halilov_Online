@@ -3,6 +3,12 @@ package com.halilov.online.user;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+/**
+ * The {@code saved_addresses} table — a user's address book. The
+ * checkout flow copies one of these into a new
+ * {@link com.halilov.online.order.Address} snapshot, so editing or
+ * deleting a saved address has no effect on already-placed orders.
+ */
 @Entity
 @Table(name = "saved_addresses")
 public class SavedAddress {

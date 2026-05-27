@@ -7,6 +7,12 @@ import jakarta.persistence.Table;
 
 import java.time.Instant;
 
+/**
+ * Per-(kind, scope) cooldown record for {@link AnomalyMonitor}. The
+ * key encodes the alert kind and the per-IP / per-account scope. The
+ * stamped {@code last_fired_at} is what suppresses re-alerts within
+ * the monitor's cooldown window.
+ */
 @Entity
 @Table(name = "anomaly_alerts")
 public class AnomalyAlertState {

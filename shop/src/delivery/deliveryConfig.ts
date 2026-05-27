@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import { api, type DeliveryConfig } from '../api'
 
+/**
+ * Server-mirrored delivery config (flat courier rate, free-above
+ * threshold). Single source of truth lives on the backend; this store
+ * caches it for the session. Defaults match the backend `app.delivery.*`
+ * values so the first paint is correct before `load()` resolves.
+ */
 type DeliveryConfigState = DeliveryConfig & {
   loaded: boolean
   load: () => Promise<void>

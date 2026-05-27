@@ -4,6 +4,13 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 
+/**
+ * One-shot 2FA recovery code. Plaintext is shown to the admin exactly
+ * once at enrollment; only the SHA-256 hex lands in this table. Each
+ * row is consumed at most once ({@code used_at}). Losing every active
+ * recovery code is the trigger for the manual SSH+SQL recovery
+ * documented in user memory.
+ */
 @Entity
 @Table(name = "totp_recovery_codes")
 public class TotpRecoveryCode {

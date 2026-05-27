@@ -8,6 +8,12 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 import java.util.List;
 
+/**
+ * Read-only admin window onto {@code audit_log} under
+ * {@code /api/admin/audit-log}. Supports filtering by actor user id,
+ * action code, and timestamp range, paginated up to 500 rows per page.
+ * Source of truth for the admin Audit page.
+ */
 @RestController
 @RequestMapping("/api/admin/audit-log")
 public class AdminAuditLogController {

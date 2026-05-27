@@ -3,6 +3,12 @@ package com.halilov.online.cart;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+/**
+ * One row in the {@code cart_lines} table — a single (user, product)
+ * with its current quantity. The SPA replaces the whole user's set on
+ * every PUT, so rows are short-lived and there's no need for
+ * line-level history.
+ */
 @Entity
 @Table(name = "cart_lines")
 public class CartLine {

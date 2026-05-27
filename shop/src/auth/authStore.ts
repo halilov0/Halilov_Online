@@ -2,6 +2,19 @@ import { create } from 'zustand'
 import { api, ApiError, setToken, getToken, type AuthResponse, type Me } from '../api'
 import { useCart } from '../cart/cartStore'
 
+/**
+ * Shop auth store.
+ *
+ * `token` is hydrated synchronously from `localStorage`; `user` is
+ * `null` until `fetchMe()` resolves. Protected routes must gate on
+ * `!token`, not `!user`, otherwise they bounce to login on every F5
+ * while `/me` is in flight.
+ *
+ * `login` / `register` use {@link adoptAuth} so the local guest cart
+ * is folded into the server cart instead of being discarded.
+ * `logout` flushes the cart to the server first, then wipes the local
+ * copy so the next visitor in this browser starts clean.
+ */
 type AuthState = {
   token: string | null
   user: Me | null

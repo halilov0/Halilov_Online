@@ -3,6 +3,15 @@ package com.halilov.online.catalog;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+/**
+ * The {@code products} table. {@code price_agorot} is integer NIS×100;
+ * {@code stock_qty} is the available count (decremented on
+ * {@code PENDING → PAID}). {@code image_urls} is a JSON array
+ * persisted via the {@code image_urls} column converter — the bytes
+ * live behind {@link com.halilov.online.media.MediaStorage}.
+ * {@code slug} drives the canonical {@code /p/{slug}} URL emitted in
+ * the sitemap.
+ */
 @Entity
 @Table(name = "products")
 public class Product {

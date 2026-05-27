@@ -12,6 +12,16 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Logged-in user self-service: profile edits, password change, saved
+ * addresses, marketing opt-in toggle. The authenticated email comes
+ * from the JWT (passed in by {@link AccountController}); the service
+ * never reads identity from request bodies.
+ *
+ * <p>Saved addresses live in their own table and are never mutated
+ * by order writes — orders snapshot their shipping address at
+ * checkout so a future profile edit doesn't rewrite shipped invoices.
+ */
 @Service
 public class AccountService {
 

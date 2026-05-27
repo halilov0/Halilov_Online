@@ -8,6 +8,15 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
+/**
+ * Server-backed cart for authenticated users under {@code /api/cart}.
+ *
+ * <p>The SPA treats the server as source of truth: {@code PUT /}
+ * replaces the cart wholesale on each debounced change.
+ * {@code POST /merge} is used once at login to fold an anonymous
+ * cart into the server cart. Guests don't hit any of these — their
+ * cart is entirely browser-side.
+ */
 @RestController
 @RequestMapping("/api/cart")
 public class CartController {

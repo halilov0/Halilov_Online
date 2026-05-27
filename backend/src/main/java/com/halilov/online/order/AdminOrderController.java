@@ -9,6 +9,13 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * Admin order management under {@code /api/admin/orders}. Lists every
+ * order, drives the status machine (including the
+ * {@code PENDING → PAID} stock decrement), issues refunds, and exports
+ * the orders table as a UTF-8 CSV with BOM (so Excel renders Hebrew
+ * correctly out of the box).
+ */
 @RestController
 @RequestMapping("/api/admin/orders")
 public class AdminOrderController {

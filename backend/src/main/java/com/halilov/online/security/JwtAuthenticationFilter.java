@@ -17,6 +17,28 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * Spring Security filter that authenticates each request from the
+ * {@code Authorization: Bearer ...} header.
+ *
+ * <p>On every authenticated request we re-read the user row from the
+ * DB to honor:
+ * <ul>
+ *   <li>Admin disable ({@code users.enabled = false}) — takes effect on
+ *       the next request, not when the JWT eventually expires.</li>
+ *   <li>Force-logout ({@code users.force_logout_at}) — admin password
+ *       reset and self-service "log out everywhere" stamp this column;
+ *       tokens issued at or before that instant fail freshness.</li>
+ * </ul>
+ *
+ * <p>One extra row read per authenticated request — fine at current
+ * traffic on a single-VM deployment, and the correctness win
+ * (revocation latency = one request) is worth more than the cost.
+ *
+ * <p>Anything not authenticated (no header, invalid token, expired
+ * token, missing user, disabled user) silently stays anonymous; the
+ * security chain decides what's reachable to anonymous callers.
+ */
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 

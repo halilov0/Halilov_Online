@@ -22,6 +22,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Admin user management under {@code /api/admin/users}. Paginated +
+ * filterable search (via a JPA {@code Specification}), enable/disable,
+ * force-logout (stamps {@code force_logout_at} so the next request from
+ * existing tokens fails the auth filter's freshness check), and
+ * admin-initiated password reset.
+ */
 @RestController
 @RequestMapping("/api/admin/users")
 public class AdminUserController {

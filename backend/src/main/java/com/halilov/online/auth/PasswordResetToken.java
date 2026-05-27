@@ -4,6 +4,11 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 
+/**
+ * One-time, time-boxed password reset token. The token is 256 bits of
+ * {@link java.security.SecureRandom}; {@code used_at} is stamped at
+ * consumption so the same row can never be reused.
+ */
 @Entity
 @Table(name = "password_reset_tokens")
 public class PasswordResetToken {

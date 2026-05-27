@@ -10,6 +10,12 @@ import com.halilov.online.common.InMemoryThrottle;
 
 import java.time.Duration;
 
+/**
+ * Public coupon validation under {@code /api/coupons}. The cart calls
+ * {@code POST /validate} to preview a discount without committing an
+ * order. Throttled per-IP (20/min) on top of the edge nginx
+ * 10r/s limit so a botnet can't dictionary-scan coupon codes.
+ */
 @RestController
 @RequestMapping("/api/coupons")
 public class CouponController {

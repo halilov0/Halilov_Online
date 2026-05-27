@@ -6,6 +6,12 @@ import org.springframework.web.bind.annotation.*;
 import com.halilov.online.audit.AuditAction;
 import com.halilov.online.audit.AuditService;
 
+/**
+ * Admin-side marketing dashboard under {@code /api/admin/marketing}.
+ * Reports the opt-in headcount and triggers a one-shot broadcast — the
+ * heavy lifting (jsoup sanitisation, outbox enqueue) is in
+ * {@link MarketingService}.
+ */
 @RestController
 @RequestMapping("/api/admin/marketing")
 public class MarketingAdminController {

@@ -27,6 +27,32 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Order lifecycle from create through refund. The state machine is
+ * {@code PENDING → PAID → FULFILLED → SHIPPED → DELIVERED}, with
+ * {@code CANCELLED} and {@code REFUNDED} as terminals.
+ *
+ * <p>Key invariants enforced here:
+ * <ul>
+ *   <li>Stock decrements only on {@code PENDING → PAID}; cancels and
+ *       refunds restore stock; coupon usage counters mirror the
+ *       transition.</li>
+ *   <li>Customer self-cancel runs through {@code FULFILLED} (parcel
+ *       not yet picked up). After {@code SHIPPED} the customer must
+ *       contact support.</li>
+ *   <li>Owner-mismatch on registered reads returns 403, never 404;
+ *       error responses must not echo the actual owner's email.</li>
+ *   <li>Guest orders carry a {@code guest_token} (one-shot, returned
+ *       at create time) and registered orders can mint an idempotent
+ *       {@code share_token} for "send the invoice to my accountant"
+ *       flows.</li>
+ * </ul>
+ *
+ * <p>Order numbers are minted from a 32-char alphabet (dropping
+ * {@code 0/1/O/I}) so a number dictated over the phone is unambiguous.
+ * Eight chars ≈ 1.1e12 combos — collision odds against the UNIQUE
+ * {@code order_number} index are negligible at our scale.
+ */
 @Service
 public class OrderService {
 
