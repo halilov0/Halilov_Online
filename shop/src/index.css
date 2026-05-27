@@ -1,26 +1,30 @@
 /* ============================================================
    Halilov Online — Classic Redesign design system
-   Aesthetic: modern marketplace. White surfaces, dark ink,
-   terracotta accent, Heebo sans throughout, mono for numerics.
+   Aesthetic: modern marketplace. White surfaces, slate ink,
+   leaf-green accent (logo-aligned), Heebo sans, mono for numerics.
 ============================================================ */
 
 :root {
   /* ---- Classic Redesign tokens ---- */
+  /* Surfaces — faintly cool-green tinted (was neutral grey) */
   --bg:        #ffffff;
-  --surface:   #f6f6f8;
-  --surface-2: #eceef1;
-  --line:      #e4e5e8;
-  --line-2:    #d2d3d8;
+  --surface:   #f4f7f5;
+  --surface-2: #e8ede9;
+  --line:      #e2e7e3;
+  --line-2:    #cfd6d1;
 
-  --ink:       #0f1014;
-  --ink-2:     #34353c;
-  --ink-3:     #6a6c75;
-  --ink-4:     #97999f;
+  /* Ink — slate family, harmonises with the logo's cart silhouette */
+  --ink:       #2f3641;
+  --ink-2:     #4b5460;
+  --ink-3:     #757e8a;
+  --ink-4:     #9aa1aa;
 
-  --accent:        oklch(0.58 0.18 27);
-  --accent-deep:   oklch(0.48 0.18 27);
-  --accent-soft:   oklch(0.96 0.04 27);
+  /* Accent — green from the logo's price-tag (was terracotta red) */
+  --accent:        oklch(0.62 0.18 138);
+  --accent-deep:   oklch(0.50 0.17 138);
+  --accent-soft:   oklch(0.96 0.05 138);
   --accent-on:     #ffffff;
+  --accent-grad:   linear-gradient(135deg, oklch(0.70 0.18 138) 0%, oklch(0.50 0.17 138) 100%);
 
   --good:      oklch(0.55 0.13 145);
   --good-soft: oklch(0.95 0.04 145);
@@ -36,9 +40,11 @@
   --r-xl: 20px;
   --r-pill: 999px;
 
-  --shadow-1: 0 1px 0 rgba(15,16,20,0.04);
-  --shadow-2: 0 1px 2px rgba(15,16,20,0.05), 0 6px 18px -8px rgba(15,16,20,0.12);
-  --shadow-3: 0 2px 4px rgba(15,16,20,0.06), 0 14px 32px -10px rgba(15,16,20,0.18);
+  /* Shadows — tint switched from black to slate */
+  --shadow-1: 0 1px 0 rgba(45,55,65,0.05);
+  --shadow-2: 0 1px 2px rgba(45,55,65,0.06), 0 6px 18px -8px rgba(45,55,65,0.14);
+  --shadow-3: 0 2px 4px rgba(45,55,65,0.07), 0 14px 32px -10px rgba(45,55,65,0.20);
+  --shadow-green: 0 8px 22px -10px oklch(0.62 0.18 138 / 0.55);
 
   --sans:  "Heebo", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono:  "JetBrains Mono", ui-monospace, monospace;
@@ -50,15 +56,19 @@
   --paper-2:      var(--surface);
   --card:         var(--bg);
 
-  --olive:        var(--ink);
-  --olive-2:      #000;
-  --olive-soft:   var(--surface);
+  --olive:        var(--accent);
+  --olive-2:      var(--accent-deep);
+  --olive-soft:   var(--accent-soft);
 
   --terracotta:   var(--accent);
   --terra-soft:   var(--accent-soft);
 
   --gold:         oklch(0.78 0.10 85);
-  --berry:        var(--accent-deep);
+  /* --berry is the DESTRUCTIVE/error red — kept red on purpose. The accent
+     is now green, so routing berry through --accent-deep (per the handoff)
+     would turn "remove from cart" and error text green. Matches the
+     #b03a3a / rgba(176,58,58) fallbacks already hardcoded alongside it. */
+  --berry:        #b03a3a;
   --leaf:         var(--good);
 }
 
@@ -105,8 +115,8 @@ input, textarea, select { font-family: inherit; }
 
 /* ---- Utility bar (top thin black) ---- */
 .cls-util-bar {
-  background: #0f1014;
-  color: #c5c7cd;
+  background: var(--ink);
+  color: #c9cdd2;
   font-size: 12px;
 }
 .cls-util-inner {
@@ -114,7 +124,7 @@ input, textarea, select { font-family: inherit; }
   padding: 8px 24px;
   display: flex; align-items: center; gap: 18px;
 }
-.cls-util-inner .sep { width: 1px; height: 12px; background: #2c2e34; }
+.cls-util-inner .sep { width: 1px; height: 12px; background: rgba(255,255,255,0.14); }
 .cls-util-inner a { display: flex; align-items: center; gap: 6px; transition: color .12s; }
 .cls-util-inner a:hover { color: #fff; }
 .cls-util-inner .util-end { margin-inline-start: auto; display: flex; align-items: center; gap: 14px; }
@@ -140,7 +150,7 @@ input, textarea, select { font-family: inherit; }
 }
 .cls-header .cls-logo img {
   display: block;
-  height: 52px;
+  height: 56px;
   width: auto;
   max-width: 100%;
 }
@@ -177,6 +187,11 @@ input, textarea, select { font-family: inherit; }
   max-width: 760px;
   margin: 0 auto;
   width: 100%;
+  transition: border-color .15s, box-shadow .15s;
+}
+.cls-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
 }
 .cls-search select {
   border: none;
@@ -205,7 +220,7 @@ input, textarea, select { font-family: inherit; }
   color: var(--ink);
 }
 .cls-search button.go {
-  background: var(--ink);
+  background: var(--accent);
   color: #fff;
   border: none;
   padding: 0 26px;
@@ -214,7 +229,7 @@ input, textarea, select { font-family: inherit; }
   display: flex; align-items: center; gap: 8px;
   transition: background .12s;
 }
-.cls-search button.go:hover { background: var(--accent); }
+.cls-search button.go:hover { background: var(--accent-deep); }
 
 /* ---- Header right icon buttons ---- */
 .cls-header-actions { display: flex; align-items: center; gap: 4px; }
@@ -301,29 +316,43 @@ input, textarea, select { font-family: inherit; }
 
 /* ---- Footer (dark) ---- */
 .cls-footer {
-  background: #0f1014;
-  color: #c5c7cd;
+  background: var(--ink);
+  color: #c5c9d0;
   padding: 40px 24px 18px;
   margin-top: 36px;
+  position: relative;
+  overflow: hidden;
+}
+.cls-footer::before {
+  content: "";
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(90deg, transparent 75%, oklch(0.62 0.18 138 / 0.18) 92%, transparent 100%) 0 8% / 100% 4px no-repeat,
+    linear-gradient(90deg, transparent 70%, oklch(0.62 0.18 138 / 0.10) 88%, transparent 100%) 0 13% / 100% 3px no-repeat;
+  pointer-events: none;
 }
 .cls-footer-inner {
   max-width: 1340px; margin: 0 auto;
   display: grid;
   grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
   gap: 36px;
+  position: relative;
 }
 .cls-footer h4 { color: #fff; font-size: 13px; font-weight: 700; margin-bottom: 14px; letter-spacing: 0.04em; text-transform: uppercase; }
 .cls-footer .col a { display: block; padding: 5px 0; font-size: 13px; color: #c5c7cd; }
 .cls-footer .col a:hover { color: #fff; }
 .cls-footer .brand-col .cls-logo { color: #fff; }
 .cls-footer .brand-col .cls-logo .sub { color: #97999f; }
-.cls-footer .brand-col .cls-logo img {
-  display: block;
-  height: 64px;
-  width: auto;
+.cls-footer .brand-col .logo-wrap {
   background: #fff;
-  padding: 8px 14px;
+  padding: 10px 16px;
   border-radius: var(--r-md);
+  display: inline-block;
+}
+.cls-footer .brand-col .logo-wrap img {
+  display: block;
+  height: 56px;
+  width: auto;
 }
 .cls-footer .brand-col p { font-size: 13px; color: #97999f; margin-top: 16px; max-width: 32ch; line-height: 1.5; }
 .cls-footer .brand-col .socials {
@@ -342,10 +371,11 @@ input, textarea, select { font-family: inherit; }
 .cls-footer-bottom {
   max-width: 1340px; margin: 28px auto 0;
   padding-top: 16px;
-  border-top: 1px solid #2a2b32;
+  border-top: 1px solid rgba(255,255,255,0.10);
   display: flex; justify-content: space-between; align-items: center;
   font-size: 12px; color: #97999f;
   gap: 12px;
+  position: relative;
 }
 .cls-footer-bottom .pays { display: flex; gap: 10px; flex-wrap: wrap; }
 .cls-footer-bottom .pay-chip {
@@ -378,7 +408,7 @@ input, textarea, select { font-family: inherit; }
 }
 .cls-hero-main {
   grid-row: 1 / 3;
-  background: linear-gradient(135deg, #0f1014 0%, #1c1d24 100%);
+  background: linear-gradient(135deg, var(--ink) 0%, #3c4754 60%, oklch(0.40 0.10 138) 110%);
   color: #fff;
   border-radius: var(--r-lg);
   padding: 44px 52px;
@@ -392,10 +422,12 @@ input, textarea, select { font-family: inherit; }
 .cls-hero-main::before {
   content: "";
   position: absolute;
-  top: -40%; inset-inline-end: -20%;
-  width: 60%; height: 180%;
-  background: radial-gradient(ellipse at center, var(--accent) 0%, transparent 60%);
-  opacity: 0.25;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent 55%, oklch(0.62 0.18 138 / 0.45) 78%, transparent 95%) 0 18% / 100% 4px no-repeat,
+    linear-gradient(90deg, transparent 40%, oklch(0.62 0.18 138 / 0.30) 70%, transparent 92%) 0 28% / 100% 3px no-repeat,
+    linear-gradient(90deg, transparent 50%, rgba(255,255,255,0.12) 75%, transparent 95%) 0 42% / 100% 2px no-repeat,
+    radial-gradient(ellipse 60% 70% at 95% 110%, oklch(0.62 0.18 138 / 0.30), transparent 60%);
   pointer-events: none;
 }
 .cls-hero-main .eyebrow {
@@ -419,7 +451,13 @@ input, textarea, select { font-family: inherit; }
   color: #fff; font-size: 46px;
   position: relative; z-index: 1;
 }
-.cls-hero-main h1 .hl { color: var(--accent); }
+.cls-hero-main h1 .hl {
+  background: var(--accent-grad);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: var(--accent); /* fallback */
+}
 .cls-hero-main p {
   color: rgba(255,255,255,0.7);
   margin-top: 14px; font-size: 15px;
@@ -489,8 +527,30 @@ input, textarea, select { font-family: inherit; }
   border: 1px solid rgba(255,255,255,0.18);
   border-radius: var(--r-pill);
 }
+/* Price-tag emblem — direct callback to the logo's price tag */
+.cls-hero-art .price-emblem {
+  position: absolute;
+  top: 20px; inset-inline-start: 20px;
+  background: var(--accent-grad);
+  color: #fff;
+  padding: 10px 16px 10px 26px;
+  font-family: var(--mono);
+  font-size: 13px; font-weight: 700;
+  letter-spacing: 0.04em;
+  border-radius: 4px 18px 18px 4px;
+  box-shadow: var(--shadow-green);
+}
+.cls-hero-art .price-emblem::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 9px; top: 50%; transform: translateY(-50%);
+  width: 7px; height: 7px;
+  background: #fff;
+  border-radius: 50%;
+}
 .cls-hero-side {
-  background: var(--surface);
+  background: var(--accent-soft);
+  border: 1px solid oklch(0.88 0.07 138);
   border-radius: var(--r-lg);
   padding: 22px 26px;
   display: grid;
@@ -504,7 +564,7 @@ input, textarea, select { font-family: inherit; }
   grid-column: 1 / -1;
   font-size: 11px; font-weight: 700;
   letter-spacing: 0.10em; text-transform: uppercase;
-  color: var(--accent);
+  color: var(--accent-deep);
 }
 .cls-hero-side h3 {
   grid-column: 1 / -1;
@@ -525,7 +585,7 @@ input, textarea, select { font-family: inherit; }
   font-family: var(--mono);
   font-size: 22px;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-deep);
 }
 .cls-hero-side .side-art {
   grid-row: 1 / 4;
@@ -583,7 +643,7 @@ input, textarea, select { font-family: inherit; }
   transition: border-color .12s, color .12s;
   letter-spacing: 0.02em;
 }
-.cls-brand-strip .brand:hover { color: var(--ink); border-color: var(--ink); }
+.cls-brand-strip .brand:hover { color: var(--accent-deep); border-color: var(--accent); }
 
 /* ---- Department tiles ---- */
 .cls-dept-tiles {
@@ -606,7 +666,7 @@ input, textarea, select { font-family: inherit; }
   border: 1px solid transparent;
   color: var(--ink);
 }
-.cls-dept-tile:hover { transform: translateY(-2px); border-color: var(--ink-2); }
+.cls-dept-tile:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: var(--shadow-2); }
 .cls-dept-tile h3 {
   font-size: 16px;
   font-weight: 700;
@@ -680,7 +740,7 @@ input, textarea, select { font-family: inherit; }
   cursor: pointer;
   transition: background .12s, border-color .12s, color .12s;
 }
-.cls-section-head .see-all:hover { background: var(--ink); color: #fff; border-color: var(--ink); }
+.cls-section-head .see-all:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 
 /* ---- Flash deals ---- */
 .cls-flash-wrap {
@@ -786,7 +846,7 @@ input, textarea, select { font-family: inherit; }
 }
 .cls-flash-card .progress .bar {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--accent-deep));
+  background: var(--accent-grad);
   border-radius: var(--r-pill);
 }
 .cls-flash-card .stock-row {
@@ -911,17 +971,18 @@ input, textarea, select { font-family: inherit; }
   display: flex;
   align-items: center;
   gap: 6px;
-  background: var(--ink);
+  background: var(--accent);
   color: #fff;
   border: none;
   border-radius: var(--r-sm);
   padding: 9px 14px;
   font-weight: 700;
   font-size: 12.5px;
+  box-shadow: var(--shadow-green);
   transition: background .12s;
   cursor: pointer;
 }
-.cls-card .add:hover:not(:disabled) { background: var(--accent); }
+.cls-card .add:hover:not(:disabled) { background: var(--accent-deep); }
 .cls-card .add:disabled { background: var(--surface-2); color: var(--ink-4); cursor: not-allowed; }
 
 /* ---- Dual promo ---- */
@@ -1687,7 +1748,7 @@ input, textarea, select { font-family: inherit; }
 .hm-switch.busy { opacity: .6; cursor: wait; }
 
 .cls-auth-decor {
-  background: linear-gradient(135deg, #0f1014 0%, #1c1d24 100%);
+  background: linear-gradient(135deg, var(--ink) 0%, #3c4754 60%, oklch(0.40 0.10 138) 110%);
   color: #fff;
   padding: 56px 64px;
   position: relative;
@@ -2184,7 +2245,7 @@ select.hm-input { appearance: none; background-image: linear-gradient(45deg, tra
 
 /* ---- HERO (legacy) ---- */
 .hm-hero {
-  background: linear-gradient(135deg, #0f1014 0%, #1c1d24 100%);
+  background: linear-gradient(135deg, var(--ink) 0%, #3c4754 60%, oklch(0.40 0.10 138) 110%);
   color: #fff;
   border-radius: var(--r-lg);
   padding: 40px 44px;
@@ -3012,7 +3073,7 @@ body:has(.hm-cookie-banner) .hm-toast-wrap { bottom: 104px; }
   align-items: center;
   gap: 14px;
   padding: 14px 18px;
-  background: #0f1014;
+  background: var(--ink);
   color: #e7e7ea;
   border: 1px solid rgba(255,255,255,0.10);
   border-radius: var(--r-md);
@@ -3454,7 +3515,7 @@ body:has(.hm-cookie-banner) .hm-toast-wrap { bottom: 104px; }
   color: var(--ink-2);
 }
 .addr-card .actions button:hover { background: var(--surface-2); }
-.addr-card .actions button.danger { color: var(--accent-deep); }
+.addr-card .actions button.danger { color: var(--berry); }
 .addr-card .actions button.link {
   background: transparent;
   border-color: transparent;

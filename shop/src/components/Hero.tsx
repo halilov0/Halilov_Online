@@ -49,6 +49,7 @@ export function Hero() {
           </div>
         </div>
         <div className="cls-hero-art">
+          <span className="price-emblem">מבצעים</span>
           <span className="tag">HALILOV · MARKET</span>
         </div>
       </div>

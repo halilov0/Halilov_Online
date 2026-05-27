@@ -677,7 +677,7 @@ function OrderRow({ o, onReorder, reordering, onCancel, cancelling }: {
               onClick={onCancel}
               disabled={cancelling}
               className="ghost"
-              style={{ color: 'var(--terracotta, #b04a2f)' }}
+              style={{ color: 'var(--berry)' }}
             >
               {cancelling ? 'מבטל…' : 'ביטול הזמנה'}
             </button>

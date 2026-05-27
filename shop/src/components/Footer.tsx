@@ -8,7 +8,9 @@ export function Footer() {
       <div className="cls-footer-inner">
         <div className="col brand-col">
           <div className="cls-logo">
-            <img src="/logo.png" alt="חלילוב אונליין" width={600} height={331} />
+            <div className="logo-wrap">
+              <img src="/logo.png" alt="חלילוב אונליין" width={600} height={331} />
+            </div>
           </div>
           <p>
             מרקט אונליין ישראלי. אלפי מוצרים, משלוח לכל הארץ,

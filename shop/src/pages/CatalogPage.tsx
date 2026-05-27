@@ -9,9 +9,11 @@ import { comingSoon } from '../components/Toast'
 import { useCart } from '../cart/cartStore'
 import { useDeliveryConfig } from '../delivery/deliveryConfig'
 
+// Brand-green family ramp — keeps the dept-tile swatches distinct per
+// department while staying on-palette (rendered at 18% opacity).
 const DEPT_COLORS = [
-  '#f4a261', '#2a9d8f', '#e76f51', '#264653',
-  '#e9c46a', '#8338ec', '#06b6d4', '#ef4444',
+  'oklch(0.72 0.16 138)', 'oklch(0.62 0.18 138)', 'oklch(0.56 0.13 158)', 'oklch(0.50 0.17 138)',
+  'oklch(0.68 0.14 125)', 'oklch(0.60 0.15 148)', 'oklch(0.66 0.17 142)', 'oklch(0.53 0.12 165)',
 ]
 
 const STUB_BRANDS = [
