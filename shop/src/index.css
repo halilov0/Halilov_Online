@@ -2487,6 +2487,8 @@ select.hm-input { appearance: none; background-image: linear-gradient(45deg, tra
   .hm-input { font-size: 16px; /* prevent iOS zoom on focus */ }
 
   .hm-toast-wrap { inset-inline-start: 16px; inset-inline-end: 16px; transform: none; align-items: center; }
+  /* Stacked banner is taller on mobile (full-width button) — lift further. */
+  body:has(.hm-cookie-banner) .hm-toast-wrap { bottom: 172px; }
 }
 
 /* ---- toast ---- */
@@ -2501,6 +2503,9 @@ select.hm-input { appearance: none; background-image: linear-gradient(45deg, tra
   gap: 8px;
   pointer-events: none;
 }
+/* Lift the stack above the cookie banner while it's showing, so toasts don't
+   overlap it at the bottom of the viewport. Drops back to 24px once accepted. */
+body:has(.hm-cookie-banner) .hm-toast-wrap { bottom: 104px; }
 .hm-toast {
   background: var(--ink);
   color: #fff;
