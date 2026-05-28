@@ -100,6 +100,12 @@ package root (`com.halilov.online`). Each subpackage carries a
   then re-reads `users` to honor admin-disable + force-logout *within
   one request* instead of waiting for the JWT to expire. One extra row
   read per authenticated request — acceptable at current traffic.
+- **Self-modify-own-credential pattern** (`PATCH /api/me/password` and
+  the password-reset flow): rotate `users.force_logout_at = now()` to
+  invalidate every previously-issued JWT, then issue a fresh token in
+  the response so the calling tab survives. Other devices die on their
+  next request. Re-use for any future endpoint where the user mutates
+  their own credentials (email change, 2FA disable, etc.).
 - **Admin 2FA**: ADMIN role + TOTP enrolled + request IP not in
   `ADMIN_TRUSTED_IPS` ⇒ login returns a `challenge` instead of a token.
   Client posts the TOTP/recovery code to `/api/auth/login/totp` to

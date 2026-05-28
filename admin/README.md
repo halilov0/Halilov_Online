@@ -85,6 +85,19 @@ The route guard:
 `null` even if the token is present, so naive `!user` guards would
 bounce on every F5.
 
+### Security page
+
+[pages/SecurityPage.tsx](src/pages/SecurityPage.tsx) handles two
+self-service flows for the logged-in admin:
+
+- **2FA enroll / disable** — `POST /api/me/totp/{enroll,confirm,disable}`.
+- **Change password** — `PATCH /api/me/password` with `{currentPassword,
+  newPassword}`. The backend rotates `users.force_logout_at` (kills
+  other devices) and returns a fresh JWT in the response. The page
+  calls `useAuth.adoptToken(token)` to persist it via `setToken()` and
+  update the store atomically, so the calling tab stays logged in.
+  Same-as-current new password → 400 with Hebrew copy.
+
 ## Build & deploy
 
 `Dockerfile` builds the static bundle and serves it from nginx

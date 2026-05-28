@@ -95,10 +95,15 @@ ones:
 - **VAT = 0.** Halilov is registered as a עוסק פטור (VAT-exempt). New
   orders persist `vat_agorot = 0`. The column stays for historical
   pre-exemption rows.
-- **Hebrew error reasons.** Spring strips `ResponseStatusException`
-  reasons from the response body — clients see only the HTTP status
-  text. We keep Hebrew reasons for logs and audit, and let the SPA map
-  status → user-facing copy.
+- **Hebrew error reasons reach the SPA** via `response.body.message`
+  because [application.yml](src/main/resources/application.yml) sets
+  `server.error.include-message: always`. Without that flag Spring
+  strips the reason from `ResponseStatusException` and the client only
+  sees the bare HTTP status. `include-binding-errors` stays off —
+  bean-validation messages aren't curated for users. If you ever
+  disable `include-message`, restore status→copy maps in the SPAs
+  before shipping. The shop's `authStore.login` already maps 401/403
+  to fixed Hebrew copy as a stable override.
 - **Audit-everything.** Every security-sensitive or order-state action
   goes through `AuditService.record*(...)`. The write runs in a
   `REQUIRES_NEW` transaction so it commits even if the caller rolls
