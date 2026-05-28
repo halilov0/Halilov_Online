@@ -6,6 +6,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.halilov.online.auth.AuthDtos;
+import com.halilov.online.security.JwtService;
+
 import java.util.List;
 
 /**
@@ -19,15 +22,31 @@ import java.util.List;
 public class AccountController {
 
     private final AccountService accountService;
+    private final JwtService jwtService;
 
-    public AccountController(AccountService accountService) {
+    public AccountController(AccountService accountService, JwtService jwtService) {
         this.accountService = accountService;
+        this.jwtService = jwtService;
     }
 
     @PutMapping("/profile")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateProfile(Authentication auth, @Valid @RequestBody AccountDtos.ProfileUpdate req) {
         accountService.updateProfile(requireEmail(auth), req);
+    }
+
+    /**
+     * Self-service password change. Returns a freshly issued JWT — the
+     * service stamps {@code force_logout_at = now} so the caller's old
+     * token would fail on the next request; the new one's {@code iat}
+     * sits at or after that stamp and survives the filter check.
+     */
+    @PatchMapping("/password")
+    public AuthDtos.TokenResponse changePassword(Authentication auth,
+                                                 @Valid @RequestBody AccountDtos.PasswordChange req) {
+        User u = accountService.changePassword(requireEmail(auth), req);
+        String token = jwtService.issue(u);
+        return new AuthDtos.TokenResponse(token, u.getEmail(), u.getRole().name(), u.getFullName());
     }
 
     @PutMapping("/marketing-consent")

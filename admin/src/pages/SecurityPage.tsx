@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
-import { api } from '../api'
+import { api, type AuthResponse } from '../api'
+import { useAuth } from '../auth/authStore'
 import { Field } from '../components/Field'
 import { useToast } from '../components/Toast'
 
@@ -9,6 +10,7 @@ type EnrollResponse = { secret: string; qrUri: string; recoveryCodes: string[] }
 
 export function SecurityPage() {
   const pushToast = useToast(s => s.push)
+  const adoptToken = useAuth(s => s.adoptToken)
   const [status, setStatus] = useState<Status | null>(null)
   const [enrollment, setEnrollment] = useState<EnrollResponse | null>(null)
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
@@ -16,6 +18,13 @@ export function SecurityPage() {
   const [disableCode, setDisableCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // password change
+  const [currentPwd, setCurrentPwd] = useState('')
+  const [newPwd, setNewPwd] = useState('')
+  const [newPwd2, setNewPwd2] = useState('')
+  const [pwdBusy, setPwdBusy] = useState(false)
+  const [pwdError, setPwdError] = useState<string | null>(null)
 
   useEffect(() => { loadStatus() }, [])
 
@@ -58,6 +67,30 @@ export function SecurityPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'שגיאה')
     } finally { setBusy(false) }
+  }
+
+  async function changePassword(e: React.FormEvent) {
+    e.preventDefault()
+    setPwdError(null)
+    if (newPwd.length < 8) { setPwdError('הסיסמה חייבת להיות לפחות 8 תווים.'); return }
+    if (newPwd !== newPwd2) { setPwdError('הסיסמאות החדשות לא תואמות.'); return }
+    if (newPwd === currentPwd) { setPwdError('הסיסמה החדשה זהה לנוכחית.'); return }
+    setPwdBusy(true)
+    try {
+      // Backend rotates `force_logout_at` and returns a fresh JWT — adopt
+      // it immediately so the next request doesn't fail with 401.
+      const res = await api<AuthResponse>('/api/me/password', {
+        method: 'PATCH',
+        body: JSON.stringify({ currentPassword: currentPwd, newPassword: newPwd }),
+      })
+      adoptToken(res.token)
+      setCurrentPwd(''); setNewPwd(''); setNewPwd2('')
+      pushToast('הסיסמה הוחלפה. סשנים אחרים נותקו.')
+    } catch (e) {
+      setPwdError(e instanceof Error ? e.message : 'שגיאה')
+    } finally {
+      setPwdBusy(false)
+    }
   }
 
   async function disableTotp() {
@@ -187,6 +220,52 @@ export function SecurityPage() {
             </div>
           </div>
         )}
+
+        {/* Password change — always visible, independent of 2FA state. */}
+        <div style={{ display: 'grid', gap: 10, paddingTop: 14, borderTop: '1px solid var(--line-2)' }}>
+          <div>
+            <strong style={{ fontSize: 15 }}>החלפת סיסמה</strong>
+            <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 4 }}>
+              שינוי הסיסמה ינתק את כל הסשנים האחרים. הסשן הנוכחי יישאר פעיל.
+            </div>
+          </div>
+          <form onSubmit={changePassword} style={{ display: 'grid', gap: 10 }}>
+            <Field
+              label="סיסמה נוכחית"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={currentPwd}
+              onChange={e => setCurrentPwd(e.target.value)}
+            />
+            <Field
+              label="סיסמה חדשה (לפחות 8 תווים)"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={8}
+              value={newPwd}
+              onChange={e => setNewPwd(e.target.value)}
+            />
+            <Field
+              label="אישור סיסמה חדשה"
+              type="password"
+              autoComplete="new-password"
+              required
+              value={newPwd2}
+              onChange={e => setNewPwd2(e.target.value)}
+            />
+            {pwdError && <div className="hm-error">{pwdError}</div>}
+            <button
+              type="submit"
+              className="hm-btn hm-btn-primary"
+              disabled={pwdBusy || !currentPwd || !newPwd || !newPwd2}
+              style={{ alignSelf: 'flex-start' }}
+            >
+              {pwdBusy ? 'מחליף…' : 'החלף סיסמה'}
+            </button>
+          </form>
+        </div>
 
         {/* Enrolled: show disable form */}
         {status?.enrolled && (

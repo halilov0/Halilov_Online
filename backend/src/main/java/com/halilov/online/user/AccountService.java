@@ -1,6 +1,7 @@
 package com.halilov.online.user;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -9,6 +10,7 @@ import com.halilov.online.audit.AuditAction;
 import com.halilov.online.audit.AuditService;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,11 +30,14 @@ public class AccountService {
     private final UserRepository users;
     private final SavedAddressRepository addresses;
     private final AuditService audit;
+    private final PasswordEncoder passwordEncoder;
 
-    public AccountService(UserRepository users, SavedAddressRepository addresses, AuditService audit) {
+    public AccountService(UserRepository users, SavedAddressRepository addresses,
+                          AuditService audit, PasswordEncoder passwordEncoder) {
         this.users = users;
         this.addresses = addresses;
         this.audit = audit;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Transactional
@@ -43,6 +48,33 @@ public class AccountService {
         u.setPhone(req.phone() == null || req.phone().isBlank() ? null : req.phone().trim());
         audit.record(AuditAction.ACCOUNT_PROFILE_UPDATED, "user", u.getId(),
             "פרופיל עודכן: " + u.getEmail());
+    }
+
+    /**
+     * Self-service password change for the logged-in user. Verifies the
+     * current password (so the JWT alone isn't enough), rejects unchanged
+     * passwords, rotates the hash, and stamps {@code force_logout_at} so
+     * every JWT issued before this call — including from other devices —
+     * is invalidated. The caller (controller) is responsible for issuing a
+     * fresh JWT for the current request and returning it to the client.
+     */
+    @Transactional
+    public User changePassword(String email, AccountDtos.PasswordChange req) {
+        User u = requireUser(email);
+        if (!passwordEncoder.matches(req.currentPassword(), u.getPasswordHash())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "הסיסמה הנוכחית שגויה");
+        }
+        if (passwordEncoder.matches(req.newPassword(), u.getPasswordHash())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "אנא בחרו סיסמה שונה מהקודמת");
+        }
+        u.setPasswordHash(passwordEncoder.encode(req.newPassword()));
+        // Truncated to seconds so the freshly-issued JWT (iat at whole-second
+        // precision) is >= force_logout_at and survives the auth-filter check.
+        u.setForceLogoutAt(Instant.now().truncatedTo(ChronoUnit.SECONDS));
+        audit.recordAs(u.getId(), u.getEmail(), u.getRole().name(),
+            AuditAction.ACCOUNT_PASSWORD_CHANGED, "user", u.getId(),
+            "סיסמה הוחלפה: " + u.getEmail(), null);
+        return u;
     }
 
     @Transactional

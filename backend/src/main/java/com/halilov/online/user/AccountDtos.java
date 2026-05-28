@@ -15,6 +15,14 @@ public class AccountDtos {
 
     public record MarketingConsentUpdate(boolean optIn) {}
 
+    /** Self-service password change for a logged-in user. The current
+     *  password is required so the JWT alone isn't enough — an attacker
+     *  who momentarily had the token can't lock the owner out. */
+    public record PasswordChange(
+        @NotBlank @Size(max = 200) String currentPassword,
+        @NotBlank @Size(min = 8, max = 200) String newPassword
+    ) {}
+
     public record AddressView(
         Long id,
         String label,

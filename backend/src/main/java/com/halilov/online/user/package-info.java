@@ -8,9 +8,10 @@
  *
  * <p>Three controllers cut by audience:
  * <ul>
- *   <li>{@link com.halilov.online.user.AccountController} — customer
- *       self-service ({@code /api/account/**}): profile update, change
- *       password, manage saved addresses, manage marketing opt-in.</li>
+ *   <li>{@link com.halilov.online.user.AccountController} — logged-in
+ *       user self-service ({@code /api/me/**}): profile update, password
+ *       change (rotates {@code force_logout_at} and returns a fresh JWT),
+ *       saved-address CRUD, marketing opt-in toggle.</li>
  *   <li>{@link com.halilov.online.user.AdminUserController} — admin
  *       CRUD ({@code /api/admin/users/**}): search, disable/enable,
  *       force-logout, reset password.</li>

@@ -38,6 +38,10 @@ type AuthState = {
   cancelTotp: () => void
   logout: () => void
   fetchMe: () => Promise<void>
+  /** Adopt a freshly issued token (e.g. after a password change rotated
+   *  `force_logout_at` and invalidated the prior JWT). Persists to
+   *  localStorage and updates the store in one shot. */
+  adoptToken: (token: string) => void
 }
 
 function isChallenge(res: unknown): res is ChallengeResponse {
@@ -110,6 +114,11 @@ export const useAuth = create<AuthState>((set, get) => ({
   logout() {
     setToken(null)
     set({ token: null, user: null })
+  },
+
+  adoptToken(token) {
+    setToken(token)
+    set({ token })
   },
 
   async fetchMe() {

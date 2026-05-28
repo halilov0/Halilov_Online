@@ -24,6 +24,13 @@ spring:
 server:
   port: ${PORT:8080}
   forward-headers-strategy: framework
+  error:
+    # Surface ResponseStatusException reason strings in the JSON body's
+    # `message` field. Without this Spring ships only `{status, error, path}`
+    # and our Hebrew copy ("אנא בחרו סיסמה שונה מהקודמת" etc.) is invisible
+    # to the SPA. Stack traces and binding-errors stay off — only the
+    # human-readable message is added.
+    include-message: always
 
 management:
   endpoints:

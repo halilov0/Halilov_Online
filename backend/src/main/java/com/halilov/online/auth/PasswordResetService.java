@@ -142,6 +142,13 @@ public class PasswordResetService {
         PasswordResetToken row = loadRedeemable(token);
         User u = users.findById(row.getUserId())
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.GONE, "user removed"));
+        // Reject same-as-current. A user landing here may suspect compromise,
+        // so reusing the existing password defeats the point of the reset.
+        // One extra bcrypt compare; no history table needed (NIST 800-63B
+        // explicitly recommends against rotation/history rules).
+        if (passwordEncoder.matches(newPassword, u.getPasswordHash())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "אנא בחרו סיסמה שונה מהקודמת");
+        }
         u.setPasswordHash(passwordEncoder.encode(newPassword));
         // Invalidate every JWT issued before this reset — the old password
         // shouldn't survive a successful change.
