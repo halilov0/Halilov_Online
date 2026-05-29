@@ -79,6 +79,7 @@ package root (`com.halilov.online`). Each subpackage carries a
 | `user`          | `User`, roles, saved addresses, account self-service, admin user CRUD.       |
 | `catalog`       | Products, categories, sitemap, public + admin catalog APIs.                  |
 | `cart`          | Server-backed cart lines for signed-in users (`cart_lines` table).           |
+| `favorites`     | Server-backed wishlist for signed-in users (`favorites` table).              |
 | `coupon`        | Discount codes (PERCENT / FIXED), usage counters, validation.                |
 | `order`         | Order lifecycle, addresses, delivery method/pricing, refunds, CSV export.    |
 | `payment`       | Mock payment provider (no real PSP wired up yet — zero PCI scope).           |
@@ -178,14 +179,28 @@ already in the DB are skipped, so the cart never doubles.
 See [CART.md](CART.md) for the full cart behavior: storage keys, sync,
 the login reconciliation table, worked scenarios, and deliberate edges.
 
-### 3.4 Money & taxes
+### 3.4 Favorites (wishlist)
+
+Same continuous-sync model as the cart, applied to a per-user set of
+product ids (`favorites` table). No quantity dimension — a product is
+either hearted or not. The frontend uses the same primitives: debounced
+`PUT /api/favorites`, `BroadcastChannel` cross-tab fan-out,
+`visibilitychange` reconcile, `pagehide` keepalive flush, owner +
+baseline localStorage keys for login reconciliation. Server-side drops
+for missing/inactive products surface as `REMOVED` adjustments (toast +
+inline notice on the favorites page), so a hearted product never
+vanishes silently.
+
+See [FAVORITES.md](FAVORITES.md) for the differences from cart.
+
+### 3.5 Money & taxes
 
 - All prices are stored as **integer agorot** (NIS × 100). No floats.
 - Halilov Online is registered as a **עוסק פטור** — VAT-exempt. New
   orders persist `vat_agorot = 0`. The column survives for historical
   records pre-exemption.
 
-### 3.5 Media
+### 3.6 Media
 
 `MediaStorage` is an interface with two implementations:
 
@@ -197,7 +212,7 @@ the login reconciliation table, worked scenarios, and deliberate edges.
 `ImageProcessor` runs single-image transforms on upload (resize,
 re-encode). No multi-image composition.
 
-### 3.6 Audit & anomaly
+### 3.7 Audit & anomaly
 
 - `AuditService.record*(...)` writes append-only rows to `audit_log`.
   All security-sensitive flows (login, password reset, admin actions,
@@ -228,7 +243,7 @@ Two Vite + React + TypeScript SPAs, shared structure:
 Shop-only:
 
 - `cart/cartStore.ts` — local cart + debounced sync to backend.
-- `favorites/favoritesStore.ts` — localStorage favorites list.
+- `favorites/favoritesStore.ts` — wishlist set + debounced sync to backend.
 - `delivery/deliveryConfig.ts` — *backend-served* delivery config
   cached on the client (single source of truth lives in `delivery_method`
   table; the client just mirrors it via `/api/delivery/config`).

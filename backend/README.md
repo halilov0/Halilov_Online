@@ -56,6 +56,7 @@ and why. Quick map:
 | `user`         | User entity, saved addresses, account self-service, admin user CRUD. |
 | `catalog`      | Products, categories, sitemap, public + admin catalog APIs.          |
 | `cart`         | Server-backed cart lines for authenticated users.                    |
+| `favorites`    | Server-backed wishlist (per-user set of product ids) for authenticated users. |
 | `coupon`       | Discount codes (PERCENT / FIXED) and usage tracking.                 |
 | `order`        | Order lifecycle, addresses, refunds, CSV export, delivery pricing.   |
 | `payment`      | Mock payment provider (zero PCI scope).                              |

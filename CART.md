@@ -5,6 +5,10 @@ it syncs, and — the part worth scrutinising — how the local cart is reconcil
 with the account on login. Written so you can read the decision table and the
 worked scenarios and decide whether each choice makes sense.
 
+> The favorites (wishlist) store is a direct port of this model to a
+> quantity-less set of product ids — see [FAVORITES.md](FAVORITES.md) for the
+> small differences.
+
 Code:
 - Frontend store: [shop/src/cart/cartStore.ts](shop/src/cart/cartStore.ts)
 - Login/logout orchestration: [shop/src/auth/authStore.ts](shop/src/auth/authStore.ts)

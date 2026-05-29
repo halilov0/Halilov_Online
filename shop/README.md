@@ -42,7 +42,7 @@ src/
   main.tsx                React root mount
   auth/authStore.ts       Zustand: token + user, login/register/logout/fetchMe
   cart/cartStore.ts       Zustand: cart lines, debounced server sync, cross-tab + cross-device
-  favorites/favoritesStore.ts  Zustand: favorites (localStorage-only)
+  favorites/favoritesStore.ts  Zustand: wishlist set, debounced server sync, cross-tab + cross-device
   delivery/deliveryConfig.ts   Zustand: server-mirrored delivery config
   lib/invoicePdf.ts       client-side invoice PDF render
   pages/                  one component per route (CatalogPage, CartPage, …)

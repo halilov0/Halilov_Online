@@ -8,9 +8,17 @@ import { useFavorites } from '../favorites/favoritesStore'
 
 export function FavoritesPage() {
   const ids = useFavorites(s => s.ids)
+  const adjustments = useFavorites(s => s.adjustments)
+  const dismissAdjustment = useFavorites(s => s.dismissAdjustment)
+  const reconcileWithRemote = useFavorites(s => s.reconcileWithRemote)
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Same focus-style sync as the cart: on mount, reconcile with the server
+  // so a heart added on another device shows up immediately (instead of
+  // waiting for the next visibilitychange).
+  useEffect(() => { void reconcileWithRemote() }, [reconcileWithRemote])
 
   useEffect(() => {
     if (ids.length === 0) {
@@ -32,6 +40,24 @@ export function FavoritesPage() {
       .finally(() => setLoading(false))
   }, [ids])
 
+  const removedBanner = adjustments.length > 0 && (
+    <div className="cls-cart-alerts">
+      {adjustments.map(a => (
+        <div key={a.productId} className="cls-cart-alert removed">
+          <span className="txt">{a.nameHe ?? 'פריט'} הוסר מהמועדפים — אינו זמין יותר</span>
+          <button
+            type="button"
+            className="dismiss"
+            onClick={() => dismissAdjustment(a.productId)}
+            aria-label="סגירת ההודעה"
+          >
+            <Icon name="x" size={14} stroke={2.2} />
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+
   return (
     <>
       <div className="hm-fav-page">
@@ -39,6 +65,8 @@ export function FavoritesPage() {
           <h1>המועדפים שלי</h1>
           <span className="count">{ids.length} {ids.length === 1 ? 'מוצר' : 'מוצרים'}</span>
         </div>
+
+        {removedBanner}
 
         {loading ? (
           <p style={{ color: 'var(--ink-3)' }}>טוען…</p>

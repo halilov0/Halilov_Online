@@ -1,6 +1,10 @@
 import { create } from 'zustand'
 import { api, ApiError, setToken, getToken, type AuthResponse, type Me } from '../api'
 import { useCart, getCartOwner, setCartOwner, clearCartBaseline, cancelPendingCartPush } from '../cart/cartStore'
+import {
+  useFavorites, getFavoritesOwner, setFavoritesOwner,
+  clearFavoritesBaseline, cancelPendingFavoritesPush,
+} from '../favorites/favoritesStore'
 
 /**
  * Shop auth store.
@@ -58,14 +62,15 @@ function loginErrorMessage(e: unknown): string {
 // expired-session cart apart from a fresh guest cart — which is how the
 // cart-doubling bug slipped through.
 async function adoptAuth(token: string, set: (s: Partial<AuthState>) => void, get: () => AuthState) {
-  const prevOwner = getCartOwner()
+  const prevCartOwner = getCartOwner()
+  const prevFavOwner = getFavoritesOwner()
   setToken(token)
   set({ token })
   await get().fetchMe()
   const myId = get().user?.id ?? null
 
   const cart = useCart.getState()
-  if (prevOwner != null && prevOwner !== myId) {
+  if (prevCartOwner != null && prevCartOwner !== myId) {
     cart.clearLocal()
     // Drop the previous user's baseline too, so if loadFromRemote fails we're
     // left clean (empty local + empty baseline) rather than "dirty" — otherwise
@@ -76,7 +81,19 @@ async function adoptAuth(token: string, set: (s: Partial<AuthState>) => void, ge
     await cart.mergeAdditionsWithRemote()
   }
 
-  if (myId != null) setCartOwner(myId)
+  const favorites = useFavorites.getState()
+  if (prevFavOwner != null && prevFavOwner !== myId) {
+    favorites.clearLocal()
+    clearFavoritesBaseline()
+    await favorites.loadFromRemote()
+  } else {
+    await favorites.mergeAdditionsWithRemote()
+  }
+
+  if (myId != null) {
+    setCartOwner(myId)
+    setFavoritesOwner(myId)
+  }
 }
 
 export const useAuth = create<AuthState>((set, get) => ({
@@ -119,16 +136,24 @@ export const useAuth = create<AuthState>((set, get) => ({
   },
 
   async logout() {
-    // SAVE_TO_DB(User_Cart) → CLEAR_LOCAL_SESSION. Continuous sync keeps the
-    // DB cart fresh during the session; this final push catches any debounced
-    // mutation still in flight, then the local cart is wiped so the next
-    // guest visiting this browser starts from zero. Cancel the debounce timer
-    // first so a stray push can't fire into the session we're tearing down.
+    // SAVE_TO_DB(User_Cart + User_Favorites) → CLEAR_LOCAL_SESSION. Continuous
+    // sync keeps both sets fresh during the session; the final pushes catch any
+    // debounced mutation still in flight, then the local copies are wiped so the
+    // next guest visiting this browser starts from zero. Cancel the debounce
+    // timers first so a stray push can't fire into the session we're tearing
+    // down.
     cancelPendingCartPush()
-    await useCart.getState().pushToRemote()
+    cancelPendingFavoritesPush()
+    await Promise.all([
+      useCart.getState().pushToRemote(),
+      useFavorites.getState().pushToRemote(),
+    ])
     useCart.getState().clearLocal()
+    useFavorites.getState().clearLocal()
     setCartOwner(null)
+    setFavoritesOwner(null)
     clearCartBaseline()
+    clearFavoritesBaseline()
     setToken(null)
     set({ token: null, user: null })
   },
@@ -141,11 +166,12 @@ export const useAuth = create<AuthState>((set, get) => ({
     try {
       const me = await api<Me>('/api/auth/me')
       set({ user: me })
-      // Tag the cart with its owner while the token is still valid, so a later
-      // silent expiry → re-login is recognised as residue (not a guest cart)
-      // even for sessions that predate this code. Never cleared on auth failure
-      // below — only an explicit logout drops it.
+      // Tag cart + favorites with their owner while the token is still valid,
+      // so a later silent expiry → re-login is recognised as residue (not a
+      // fresh guest set) even for sessions that predate this code. Never
+      // cleared on auth failure below — only an explicit logout drops them.
       setCartOwner(me.id)
+      setFavoritesOwner(me.id)
     } catch (e) {
       // Only treat real auth failures (401/403) as a logout. 429/5xx/network
       // blips must not nuke the session — that caused users to get kicked

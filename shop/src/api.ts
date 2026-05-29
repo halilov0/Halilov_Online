@@ -350,3 +350,27 @@ export type CartResponse = {
   lines: CartLineView[]
   adjustments: CartAdjustment[]
 }
+
+// ----- favorites sync -----
+
+export type FavoritesReplaceRequest = { productIds: number[] }
+
+/**
+ * A change the server made to the desired favorites that the client didn't
+ * ask for. Only `REMOVED` today — favorites have no quantity, so there's
+ * nothing to clamp. `nameHe` is null when the product no longer exists.
+ * The store surfaces these as toasts + an inline notice on the favorites
+ * page so a hearted product never vanishes silently.
+ */
+export type FavoriteAdjustment = {
+  productId: number
+  nameHe: string | null
+  type: 'REMOVED'
+}
+
+/** Canonical favorites set plus any server-side adjustments — returned
+ *  by every `/api/favorites` read/write except DELETE. */
+export type FavoritesResponse = {
+  productIds: number[]
+  adjustments: FavoriteAdjustment[]
+}
