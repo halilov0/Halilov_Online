@@ -10,6 +10,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.halilov.online.audit.AuditAction;
 import com.halilov.online.audit.AuditService;
+import com.halilov.online.common.BulkIdsRequest;
+import com.halilov.online.common.BulkResult;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -54,6 +56,16 @@ public class CatalogAdminController {
         audit.record(AuditAction.CATEGORY_DELETED, "category", id, "קטגוריה נמחקה (#" + id + ")");
     }
 
+    /** Bulk-delete categories. POST (not DELETE-with-body) so the id list
+     *  travels in a normal JSON body across every client/proxy. */
+    @PostMapping("/categories/bulk-delete")
+    public BulkResult bulkDeleteCategories(@Valid @RequestBody BulkIdsRequest req) {
+        int deleted = catalog.deleteCategories(req.ids());
+        audit.record(AuditAction.CATEGORY_BULK_DELETED, "category", null,
+            deleted + " קטגוריות נמחקו בבת אחת", BulkResult.idsMetadata(req.ids()));
+        return new BulkResult(deleted, req.ids().size() - deleted);
+    }
+
     @PostMapping("/products")
     @ResponseStatus(HttpStatus.CREATED)
     public CatalogDtos.ProductView createProduct(@Valid @RequestBody CatalogDtos.ProductUpsert req) {
@@ -74,6 +86,15 @@ public class CatalogAdminController {
     public void deleteProduct(@PathVariable Long id) {
         catalog.deleteProduct(id);
         audit.record(AuditAction.PRODUCT_DELETED, "product", id, "מוצר נמחק (#" + id + ")");
+    }
+
+    /** Bulk-delete products. CSV export exists as a pre-delete backup. */
+    @PostMapping("/products/bulk-delete")
+    public BulkResult bulkDeleteProducts(@Valid @RequestBody BulkIdsRequest req) {
+        int deleted = catalog.deleteProducts(req.ids());
+        audit.record(AuditAction.PRODUCT_BULK_DELETED, "product", null,
+            deleted + " מוצרים נמחקו בבת אחת", BulkResult.idsMetadata(req.ids()));
+        return new BulkResult(deleted, req.ids().size() - deleted);
     }
 
     @GetMapping(value = "/products.csv", produces = "text/csv; charset=UTF-8")

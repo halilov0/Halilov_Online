@@ -13,8 +13,12 @@ import org.springframework.web.server.ResponseStatusException;
 import com.halilov.online.audit.AuditAction;
 import com.halilov.online.audit.AuditService;
 import com.halilov.online.auth.PasswordResetService;
+import com.halilov.online.common.BulkResult;
 import com.halilov.online.order.OrderRepository;
 import com.halilov.online.order.OrderStatus;
+
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -91,6 +95,37 @@ public class AdminUserController {
         return AdminUserRow.of(u, null);
     }
 
+    /**
+     * Bulk enable/disable. ADMIN-role rows are never touched — they're
+     * counted as {@code skipped} so an over-broad "select all" can't lock
+     * the operator (or a co-admin) out of the panel. Disabling also stamps
+     * {@code force_logout_at} to drop live sessions, matching {@link #patch}.
+     */
+    @PostMapping("/bulk-status")
+    public BulkResult bulkStatus(@Valid @RequestBody BulkStatusRequest req) {
+        List<User> targets = users.findAllById(req.ids());
+        Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+        int affected = 0;
+        int skipped = 0;
+        for (User u : targets) {
+            if (u.getRole() == Role.ADMIN) { skipped++; continue; }
+            if (u.isEnabled() == req.enabled()) { skipped++; continue; }
+            u.setEnabled(req.enabled());
+            if (!req.enabled()) u.setForceLogoutAt(now);
+            affected++;
+        }
+        users.saveAll(targets);
+        // Account for ids that didn't resolve to a row at all.
+        skipped += req.ids().size() - targets.size();
+        if (affected > 0) {
+            audit.record(req.enabled() ? AuditAction.USER_BULK_ENABLED : AuditAction.USER_BULK_DISABLED,
+                "user", null,
+                affected + (req.enabled() ? " חשבונות הופעלו בבת אחת" : " חשבונות הושבתו בבת אחת"),
+                BulkResult.idsMetadata(req.ids()));
+        }
+        return new BulkResult(affected, skipped);
+    }
+
     @PostMapping("/{id}/password-reset")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void triggerPasswordReset(@PathVariable Long id) {
@@ -163,4 +198,9 @@ public class AdminUserController {
     }
 
     public record AdminUserPatch(@NotNull Boolean enabled) {}
+
+    public record BulkStatusRequest(
+        @NotEmpty @Size(max = 2000) List<Long> ids,
+        @NotNull Boolean enabled
+    ) {}
 }

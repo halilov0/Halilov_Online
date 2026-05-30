@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { RequireAdmin } from './components/RequireAdmin'
 import { ToastHost } from './components/Toast'
+import { ConfirmHost } from './components/ConfirmDialog'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { ProductsPage } from './pages/ProductsPage'
@@ -34,6 +35,7 @@ function App() {
         <Route path="*" element={<div style={{ padding: '2rem' }}>404</div>} />
       </Routes>
       <ToastHost />
+      <ConfirmHost />
     </>
   )
 }

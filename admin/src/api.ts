@@ -168,6 +168,12 @@ export type CouponUpsert = {
   active: boolean
 }
 
+/** Response shape for every bulk admin operation (delete, enable/disable). */
+export type BulkResult = { affected: number; skipped: number }
+
+/** Response from the audit-log retention purge. */
+export type PurgeResult = { deleted: number; olderThanDays: number }
+
 export function formatPrice(agorot: number): string {
   return `₪${(agorot / 100).toFixed(2)}`
 }

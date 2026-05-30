@@ -1,7 +1,12 @@
-import { useEffect, useState } from 'react'
-import { api, type Category, type CategoryUpsert } from '../api'
+import { useEffect, useMemo, useState } from 'react'
+import { api, type BulkResult, type Category, type CategoryUpsert } from '../api'
 import { Field } from '../components/Field'
 import { Icon } from '../components/Icon'
+import { Checkbox } from '../components/Checkbox'
+import { BulkBar } from '../components/BulkBar'
+import { confirmDialog, confirmBulkDelete } from '../components/ConfirmDialog'
+import { useToast } from '../components/Toast'
+import { useRowSelection } from '../hooks/useRowSelection'
 
 const emptyDraft: CategoryUpsert = { slug: '', nameHe: '', parentId: null, sortOrder: 0 }
 
@@ -12,6 +17,10 @@ export function CategoriesPage() {
   const [draft, setDraft] = useState<CategoryUpsert>(emptyDraft)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const push = useToast(s => s.push)
+
+  const categoryIds = useMemo(() => categories.map(c => c.id), [categories])
+  const sel = useRowSelection<number>(categoryIds)
 
   function load() {
     setError(null)
@@ -45,10 +54,34 @@ export function CategoriesPage() {
   }
 
   async function remove(c: Category) {
-    if (!confirm(`למחוק "${c.nameHe}"? מוצרים שמשויכים יישארו ללא קטגוריה.`)) return
+    const ok = await confirmDialog({
+      title: 'מחיקת קטגוריה',
+      message: `למחוק "${c.nameHe}"? מוצרים שמשויכים יישארו ללא קטגוריה.`,
+      confirmLabel: 'מחק', danger: true,
+    })
+    if (!ok) return
     try {
       await api(`/api/admin/catalog/categories/${c.id}`, { method: 'DELETE' })
       load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'שגיאה')
+    }
+  }
+
+  async function bulkDelete() {
+    const n = sel.count
+    if (n === 0) return
+    const ok = await confirmBulkDelete(n, {
+      title: `מחיקת ${n} קטגוריות`,
+      message: 'מוצרים שמשויכים לקטגוריות אלו יישארו ללא קטגוריה.',
+    })
+    if (!ok) return
+    try {
+      const res = await api<BulkResult>('/api/admin/catalog/categories/bulk-delete', {
+        method: 'POST', body: JSON.stringify({ ids: sel.selectedList }),
+      })
+      push(`${res.affected} קטגוריות נמחקו`)
+      sel.clear(); load()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'שגיאה')
     }
@@ -91,6 +124,10 @@ export function CategoriesPage() {
       <table className="adm-table">
         <thead>
           <tr>
+            <th className="sel">
+              <Checkbox checked={sel.allSelected} indeterminate={sel.someSelected}
+                        onClick={() => sel.toggleAll()} ariaLabel="בחר הכל" />
+            </th>
             <th style={{ width: 80 }}>סדר</th>
             <th>שם</th>
             <th>Slug</th>
@@ -98,8 +135,13 @@ export function CategoriesPage() {
           </tr>
         </thead>
         <tbody>
-          {categories.map(c => (
-            <tr key={c.id}>
+          {categories.map((c, index) => (
+            <tr key={c.id} className={sel.isSelected(c.id) ? 'selected' : ''}>
+              <td className="sel">
+                <Checkbox checked={sel.isSelected(c.id)}
+                          onClick={(e) => sel.toggle(index, e.shiftKey)}
+                          ariaLabel={`בחר ${c.nameHe}`} />
+              </td>
               <td className="num">{c.sortOrder}</td>
               <td style={{ fontWeight: 500 }}>{c.nameHe}</td>
               <td className="num" style={{ color: 'var(--ink-3)' }}>{c.slug}</td>
@@ -112,10 +154,14 @@ export function CategoriesPage() {
             </tr>
           ))}
           {categories.length === 0 && (
-            <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 30 }}>אין קטגוריות.</td></tr>
+            <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 30 }}>אין קטגוריות.</td></tr>
           )}
         </tbody>
       </table>
+
+      <BulkBar count={sel.count} onClear={sel.clear}>
+        <button className="hm-btn hm-btn-danger" onClick={bulkDelete}>מחיקת נבחרים</button>
+      </BulkBar>
     </>
   )
 }

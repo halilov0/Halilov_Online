@@ -69,6 +69,17 @@ public class CouponService {
         coupons.deleteById(id);
     }
 
+    /** Bulk delete. Unknown ids are skipped; returns the number actually
+     *  removed so the controller can audit the real count. */
+    /** Bulk delete. Unknown ids are skipped; returns the number actually
+     *  removed so the controller can audit the real count. */
+    @Transactional
+    public int adminDeleteMany(List<Long> ids) {
+        List<Coupon> found = coupons.findAllById(ids);
+        coupons.deleteAll(found);
+        return found.size();
+    }
+
     @Transactional(readOnly = true)
     public CouponDtos.ValidateResponse validate(CouponDtos.ValidateRequest req) {
         Coupon c = requireUsable(req.code(), req.subtotalAgorot());

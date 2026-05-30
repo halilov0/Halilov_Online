@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { api, downloadFile, formatPrice, type Category, type Product, type ProductUpsert } from '../api'
+import { api, downloadFile, formatPrice, type BulkResult, type Category, type Product, type ProductUpsert } from '../api'
 import { Field } from '../components/Field'
 import { Icon } from '../components/Icon'
+import { Checkbox } from '../components/Checkbox'
+import { BulkBar } from '../components/BulkBar'
+import { confirmDialog, confirmBulkDelete } from '../components/ConfirmDialog'
+import { useToast } from '../components/Toast'
+import { useRowSelection } from '../hooks/useRowSelection'
 
 const emptyDraft: ProductUpsert = {
   sku: '', slug: '', nameHe: '', descriptionHe: '',
@@ -28,6 +33,8 @@ export function ProductsPage() {
 
   useEffect(() => { setQuery(urlQuery) }, [urlQuery])
 
+  const push = useToast(s => s.push)
+
   const filteredProducts = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return products
@@ -36,6 +43,9 @@ export function ProductsPage() {
       p.sku.toLowerCase().includes(q)
     )
   }, [products, query])
+
+  const filteredIds = useMemo(() => filteredProducts.map(p => p.id), [filteredProducts])
+  const sel = useRowSelection<number>(filteredIds)
 
   const updateQuery = (v: string) => {
     setQuery(v)
@@ -142,11 +152,36 @@ export function ProductsPage() {
   }
 
   async function remove(p: Product) {
-    if (!confirm(`למחוק את "${p.nameHe}"?`)) return
+    const ok = await confirmDialog({
+      title: 'מחיקת מוצר',
+      message: `למחוק את "${p.nameHe}"? פעולה זו בלתי הפיכה.`,
+      confirmLabel: 'מחק', danger: true,
+    })
+    if (!ok) return
     setError(null)
     try {
       await api(`/api/admin/catalog/products/${p.id}`, { method: 'DELETE' })
       load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'שגיאה')
+    }
+  }
+
+  async function bulkDelete() {
+    const n = sel.count
+    if (n === 0) return
+    const ok = await confirmBulkDelete(n, {
+      title: `מחיקת ${n} מוצרים`,
+      message: 'המוצרים יוסרו לצמיתות מהקטלוג. מומלץ לייצא CSV לפני המחיקה.',
+    })
+    if (!ok) return
+    setError(null)
+    try {
+      const res = await api<BulkResult>('/api/admin/catalog/products/bulk-delete', {
+        method: 'POST', body: JSON.stringify({ ids: sel.selectedList }),
+      })
+      push(`${res.affected} מוצרים נמחקו`)
+      sel.clear(); load()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'שגיאה')
     }
@@ -393,6 +428,10 @@ export function ProductsPage() {
       <table className="adm-table">
         <thead>
           <tr>
+            <th className="sel">
+              <Checkbox checked={sel.allSelected} indeterminate={sel.someSelected}
+                        onClick={() => sel.toggleAll()} ariaLabel="בחר הכל" />
+            </th>
             <th style={{ width: 56 }}></th>
             <th>שם</th>
             <th>מק״ט</th>
@@ -404,11 +443,16 @@ export function ProductsPage() {
           </tr>
         </thead>
         <tbody>
-          {filteredProducts.map(p => {
+          {filteredProducts.map((p, index) => {
             const lowStock = p.stockQty < 10
             const outOfStock = p.stockQty <= 0
             return (
-              <tr key={p.id}>
+              <tr key={p.id} className={sel.isSelected(p.id) ? 'selected' : ''}>
+                <td className="sel">
+                  <Checkbox checked={sel.isSelected(p.id)}
+                            onClick={(e) => sel.toggle(index, e.shiftKey)}
+                            ariaLabel={`בחר ${p.nameHe}`} />
+                </td>
                 <td>
                   <div style={{
                     width: 42, height: 42, borderRadius: 'var(--r-sm)',
@@ -449,12 +493,16 @@ export function ProductsPage() {
             )
           })}
           {filteredProducts.length === 0 && (
-            <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 30 }}>
+            <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 30 }}>
               {query.trim() ? `אין תוצאות עבור "${query.trim()}".` : 'אין מוצרים. לחצו "מוצר חדש".'}
             </td></tr>
           )}
         </tbody>
       </table>
+
+      <BulkBar count={sel.count} onClear={sel.clear}>
+        <button className="hm-btn hm-btn-danger" onClick={bulkDelete}>מחיקת נבחרים</button>
+      </BulkBar>
     </>
   )
 }

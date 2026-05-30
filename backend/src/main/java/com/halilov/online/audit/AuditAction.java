@@ -30,14 +30,17 @@ public final class AuditAction {
     public static final String PRODUCT_CREATED     = "PRODUCT_CREATED";
     public static final String PRODUCT_UPDATED     = "PRODUCT_UPDATED";
     public static final String PRODUCT_DELETED     = "PRODUCT_DELETED";
+    public static final String PRODUCT_BULK_DELETED = "PRODUCT_BULK_DELETED";
     public static final String CATEGORY_CREATED    = "CATEGORY_CREATED";
     public static final String CATEGORY_UPDATED    = "CATEGORY_UPDATED";
     public static final String CATEGORY_DELETED    = "CATEGORY_DELETED";
+    public static final String CATEGORY_BULK_DELETED = "CATEGORY_BULK_DELETED";
 
     // coupons (admin)
     public static final String COUPON_CREATED      = "COUPON_CREATED";
     public static final String COUPON_UPDATED      = "COUPON_UPDATED";
     public static final String COUPON_DELETED      = "COUPON_DELETED";
+    public static final String COUPON_BULK_DELETED = "COUPON_BULK_DELETED";
 
     // marketing (admin)
     public static final String MARKETING_CAMPAIGN_SENT = "MARKETING_CAMPAIGN_SENT";
@@ -52,7 +55,12 @@ public final class AuditAction {
     // admin user management (admin → other user)
     public static final String USER_ENABLED        = "USER_ENABLED";
     public static final String USER_DISABLED       = "USER_DISABLED";
+    public static final String USER_BULK_ENABLED   = "USER_BULK_ENABLED";
+    public static final String USER_BULK_DISABLED  = "USER_BULK_DISABLED";
     public static final String USER_FORCE_LOGOUT   = "USER_FORCE_LOGOUT";
+
+    // audit log maintenance (admin)
+    public static final String AUDIT_LOG_PURGED    = "AUDIT_LOG_PURGED";
 
     // password reset
     public static final String PASSWORD_RESET_REQUESTED = "PASSWORD_RESET_REQUESTED";

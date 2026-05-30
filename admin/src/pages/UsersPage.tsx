@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, formatPrice, type AdminUserList, type AdminUserRow } from '../api'
+import { api, formatPrice, type AdminUserList, type AdminUserRow, type BulkResult } from '../api'
 import { Icon } from '../components/Icon'
 import { useToast } from '../components/Toast'
+import { Checkbox } from '../components/Checkbox'
+import { BulkBar } from '../components/BulkBar'
+import { confirmDialog, BULK_TYPE_CONFIRM_THRESHOLD } from '../components/ConfirmDialog'
+import { useRowSelection } from '../hooks/useRowSelection'
 
 const PAGE_SIZE = 50
 
@@ -13,6 +17,9 @@ export function UsersPage() {
   const [page, setPage] = useState(0)
   const [busy, setBusy] = useState<number | null>(null)
   const push = useToast(s => s.push)
+
+  const rowIds = useMemo(() => (data?.content ?? []).map(u => u.id), [data])
+  const sel = useRowSelection<number>(rowIds)
 
   const load = () => {
     setError(null)
@@ -79,6 +86,30 @@ export function UsersPage() {
     }
   }
 
+  const bulkSetEnabled = async (enabled: boolean) => {
+    const n = sel.count
+    if (n === 0) return
+    const ok = await confirmDialog({
+      title: enabled ? `הפעלת ${n} חשבונות` : `השבתת ${n} חשבונות`,
+      message: enabled
+        ? 'החשבונות הנבחרים יופעלו. חשבונות מנהל ידולגו.'
+        : 'החשבונות הנבחרים יושבתו וינותקו מכל המכשירים. חשבונות מנהל ידולגו.',
+      confirmLabel: enabled ? 'הפעל' : 'השבת',
+      danger: !enabled,
+      challenge: !enabled && n > BULK_TYPE_CONFIRM_THRESHOLD ? String(n) : undefined,
+    })
+    if (!ok) return
+    try {
+      const res = await api<BulkResult>('/api/admin/users/bulk-status', {
+        method: 'POST', body: JSON.stringify({ ids: sel.selectedList, enabled }),
+      })
+      push(`${res.affected} ${enabled ? 'הופעלו' : 'הושבתו'}${res.skipped ? ` · ${res.skipped} דולגו` : ''}`)
+      sel.clear(); load()
+    } catch (e: any) {
+      push(e.message ?? 'שגיאה')
+    }
+  }
+
   const rows = data?.content ?? []
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.size)) : 1
 
@@ -117,6 +148,10 @@ export function UsersPage() {
       <table className="adm-table">
         <thead>
           <tr>
+            <th className="sel">
+              <Checkbox checked={sel.allSelected} indeterminate={sel.someSelected}
+                        onClick={() => sel.toggleAll()} ariaLabel="בחר הכל" />
+            </th>
             <th>אימייל</th><th>שם</th><th>טלפון</th>
             <th>הצטרף</th><th>הזמנות</th><th>סה״כ קניות</th>
             <th>סטטוס</th>
@@ -124,8 +159,13 @@ export function UsersPage() {
           </tr>
         </thead>
         <tbody>
-          {rows.map(u => (
-            <tr key={u.id}>
+          {rows.map((u, index) => (
+            <tr key={u.id} className={sel.isSelected(u.id) ? 'selected' : ''}>
+              <td className="sel">
+                <Checkbox checked={sel.isSelected(u.id)}
+                          onClick={(e) => sel.toggle(index, e.shiftKey)}
+                          ariaLabel={`בחר ${u.email}`} />
+              </td>
               <td>
                 <b>{u.email}</b>
                 {u.role === 'ADMIN' && (
@@ -189,10 +229,15 @@ export function UsersPage() {
             </tr>
           ))}
           {rows.length === 0 && data && (
-            <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 30 }}>אין משתמשים תואמים.</td></tr>
+            <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 30 }}>אין משתמשים תואמים.</td></tr>
           )}
         </tbody>
       </table>
+
+      <BulkBar count={sel.count} onClear={sel.clear}>
+        <button className="hm-btn hm-btn-quiet" onClick={() => bulkSetEnabled(true)}>הפעלת נבחרים</button>
+        <button className="hm-btn hm-btn-danger" onClick={() => bulkSetEnabled(false)}>השבתת נבחרים</button>
+      </BulkBar>
 
       {data && totalPages > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 18 }}>

@@ -93,6 +93,7 @@ input, textarea, select { font-family: inherit; }
 .hm-btn-quiet { background: var(--card); border-color: var(--line); color: var(--ink); }
 .hm-btn-quiet:hover:not(:disabled) { background: var(--paper-2); }
 .hm-btn-danger { background: var(--berry); color: var(--card); }
+.hm-btn-danger:hover:not(:disabled) { filter: brightness(0.92); }
 
 /* ---- INPUT ---- */
 .hm-field { display: flex; flex-direction: column; gap: 6px; }
@@ -454,5 +455,104 @@ textarea.hm-input { resize: vertical; min-height: 70px; }
 }
 @keyframes hm-toast-in {
   from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ---- row-selection checkbox ---- */
+.hm-check {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 17px; height: 17px;
+  border: 1.5px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--card);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background .1s, border-color .1s;
+}
+.hm-check:hover { border-color: var(--olive); }
+.hm-check:checked, .hm-check:indeterminate {
+  background: var(--olive);
+  border-color: var(--olive);
+}
+.hm-check:checked::after {
+  content: "";
+  width: 9px; height: 9px;
+  background: var(--card);
+  clip-path: polygon(14% 47%, 0 60%, 40% 100%, 100% 22%, 86% 9%, 39% 71%);
+}
+.hm-check:indeterminate::after {
+  content: "";
+  width: 9px; height: 2px;
+  background: var(--card);
+  border-radius: 1px;
+}
+.adm-table td.sel, .adm-table th.sel { width: 44px; text-align: center; padding-inline: 10px; }
+.adm-table tbody tr.selected { background: var(--olive-soft); }
+.adm-table tbody tr.selected:hover { background: var(--olive-soft); }
+
+/* ---- bulk action bar ---- */
+.hm-bulkbar {
+  position: sticky;
+  bottom: 18px;
+  z-index: 5;
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-2);
+  animation: hm-toast-in .18s ease;
+}
+.hm-bulkbar-count {
+  font-weight: 700;
+  font-size: 13.5px;
+  white-space: nowrap;
+  padding-inline-end: 4px;
+  border-inline-end: 1px solid oklch(0.32 0.01 80);
+}
+.hm-bulkbar-actions { display: flex; gap: 8px; align-items: center; }
+.hm-bulkbar .hm-btn-quiet { background: oklch(0.26 0.01 80); border-color: oklch(0.34 0.01 80); color: var(--paper); }
+.hm-bulkbar .hm-btn-quiet:hover:not(:disabled) { background: oklch(0.32 0.01 80); }
+.hm-bulkbar .hm-btn-ghost { border-color: oklch(0.4 0.01 80); color: oklch(0.8 0.02 80); }
+.hm-bulkbar .hm-btn-ghost:hover:not(:disabled) { background: oklch(0.26 0.01 80); }
+
+/* ---- modal / confirm dialog ---- */
+.hm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(26, 22, 18, 0.42);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  animation: hm-fade-in .12s ease;
+}
+.hm-modal {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-2);
+  width: 100%;
+  max-width: 440px;
+  padding: 24px;
+  animation: hm-modal-in .16s ease;
+}
+.hm-modal-title { font-family: var(--serif); font-size: 22px; margin-bottom: 8px; }
+.hm-modal-body { color: var(--ink-2); font-size: 14px; line-height: 1.5; }
+.hm-modal-actions {
+  display: flex;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-top: 22px;
+}
+@keyframes hm-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes hm-modal-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
   to   { opacity: 1; transform: none; }
 }

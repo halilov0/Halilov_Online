@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { api, type AuditLogList, type AuditLogRow } from '../api'
+import { api, downloadFile, type AuditLogList, type AuditLogRow, type PurgeResult } from '../api'
+import { confirmDialog } from '../components/ConfirmDialog'
+import { useToast } from '../components/Toast'
 
 const PAGE_SIZE = 100
 
@@ -55,6 +57,21 @@ export function AuditLogPage() {
   const [from, setFrom] = useState(initialFrom)
   const [to, setTo] = useState(initialTo)
   const [page, setPage] = useState(0)
+  const [reloadKey, setReloadKey] = useState(0)
+  const [purgeDays, setPurgeDays] = useState('90')
+  const [exporting, setExporting] = useState(false)
+  const [purging, setPurging] = useState(false)
+  const push = useToast(s => s.push)
+
+  /** Query string for the active filters, shared by the list, CSV export. */
+  const filterParams = () => {
+    const params = new URLSearchParams()
+    if (userIdParam) params.set('userId', userIdParam)
+    if (action) params.set('action', action)
+    if (from) params.set('from', from)
+    if (to) params.set('to', to)
+    return params
+  }
 
   useEffect(() => {
     api<string[]>('/api/admin/audit-log/actions').then(setActions).catch(() => {})
@@ -62,15 +79,50 @@ export function AuditLogPage() {
 
   useEffect(() => {
     setError(null)
-    const params = new URLSearchParams({ page: String(page), size: String(PAGE_SIZE) })
-    if (userIdParam) params.set('userId', userIdParam)
-    if (action) params.set('action', action)
-    if (from) params.set('from', from)
-    if (to) params.set('to', to)
+    const params = filterParams()
+    params.set('page', String(page))
+    params.set('size', String(PAGE_SIZE))
     api<AuditLogList>(`/api/admin/audit-log?${params.toString()}`)
       .then(setData)
       .catch(e => setError(e.message))
-  }, [page, userIdParam, action, from, to])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, userIdParam, action, from, to, reloadKey])
+
+  async function exportCsv() {
+    setExporting(true); setError(null)
+    try {
+      const qs = filterParams().toString()
+      await downloadFile(`/api/admin/audit-log/export.csv${qs ? `?${qs}` : ''}`, 'audit-log.csv')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'שגיאה בייצוא')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  async function purge() {
+    const days = Number(purgeDays)
+    if (!Number.isInteger(days) || days < 1) { setError('מספר ימים לא תקין (מינימום 1)'); return }
+    const ok = await confirmDialog({
+      title: 'ניקוי רשומות ישנות',
+      message: `כל רשומות הלוג הישנות מ-${days} ימים יימחקו לצמיתות. רשומות חדשות יותר יישמרו, והניקוי עצמו יתועד בלוג.`,
+      confirmLabel: 'נקה',
+      danger: true,
+      challenge: 'מחק',
+      challengeHint: 'הקלידו "מחק" לאישור',
+    })
+    if (!ok) return
+    setPurging(true); setError(null)
+    try {
+      const res = await api<PurgeResult>(`/api/admin/audit-log?olderThanDays=${days}`, { method: 'DELETE' })
+      push(`${res.deleted} רשומות נמחקו`)
+      setPage(0); setReloadKey(k => k + 1)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'שגיאה בניקוי')
+    } finally {
+      setPurging(false)
+    }
+  }
 
   const updateFilter = (next: Record<string, string>) => {
     const params = new URLSearchParams(searchParams)
@@ -94,14 +146,35 @@ export function AuditLogPage() {
             {userIdParam && ` · מסונן למשתמש #${userIdParam}`}
           </div>
         </div>
-        {userIdParam && (
-          <button className="hm-btn hm-btn-quiet" onClick={() => updateFilter({ userId: '' })}>
-            הסר סינון משתמש
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {userIdParam && (
+            <button className="hm-btn hm-btn-quiet" onClick={() => updateFilter({ userId: '' })}>
+              הסר סינון משתמש
+            </button>
+          )}
+          <button className="hm-btn hm-btn-quiet" onClick={exportCsv} disabled={exporting}>
+            {exporting ? 'מייצא…' : 'ייצוא CSV'}
           </button>
-        )}
+        </div>
       </div>
 
       {error && <div className="hm-error" style={{ marginBottom: 14 }}>{error}</div>}
+
+      <div className="adm-card" style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <span style={{ fontWeight: 600 }}>ניקוי רשומות ישנות</span>
+        <span className="hm-meta">מחיקת רשומות ישנות מ-</span>
+        <input
+          type="number" min={1}
+          value={purgeDays}
+          onChange={e => setPurgeDays(e.target.value)}
+          className="hm-input mono"
+          style={{ width: 80 }}
+        />
+        <span className="hm-meta">ימים</span>
+        <button className="hm-btn hm-btn-danger" onClick={purge} disabled={purging} style={{ marginInlineStart: 'auto' }}>
+          {purging ? 'מנקה…' : 'נקה רשומות ישנות'}
+        </button>
+      </div>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         <select

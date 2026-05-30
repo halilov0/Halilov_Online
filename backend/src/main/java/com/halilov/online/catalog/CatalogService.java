@@ -146,6 +146,28 @@ public class CatalogService {
         products.deleteById(id);
     }
 
+    /**
+     * Delete every product whose id is in {@code ids}. Ids that don't
+     * resolve to a row are silently skipped, so the returned count is the
+     * number actually removed — the caller audits that, not the request
+     * size. One DB round-trip via {@code findAllById} + {@code deleteAll}.
+     */
+    @Transactional
+    public int deleteProducts(List<Long> ids) {
+        List<Product> found = products.findAllById(ids);
+        products.deleteAll(found);
+        return found.size();
+    }
+
+    /** Bulk sibling of {@link #deleteCategory}. Products keep working;
+     *  they just lose the category link, exactly like the single delete. */
+    @Transactional
+    public int deleteCategories(List<Long> ids) {
+        List<Category> found = categories.findAllById(ids);
+        categories.deleteAll(found);
+        return found.size();
+    }
+
     private void applyCategory(Category c, CatalogDtos.CategoryUpsert req) {
         c.setSlug(req.slug());
         c.setNameHe(req.nameHe());

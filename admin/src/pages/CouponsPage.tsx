@@ -1,7 +1,12 @@
-import { useEffect, useState } from 'react'
-import { api, formatPrice, type Coupon, type CouponType, type CouponUpsert } from '../api'
+import { useEffect, useMemo, useState } from 'react'
+import { api, formatPrice, type BulkResult, type Coupon, type CouponType, type CouponUpsert } from '../api'
 import { Field } from '../components/Field'
 import { Icon } from '../components/Icon'
+import { Checkbox } from '../components/Checkbox'
+import { BulkBar } from '../components/BulkBar'
+import { confirmDialog, confirmBulkDelete } from '../components/ConfirmDialog'
+import { useToast } from '../components/Toast'
+import { useRowSelection } from '../hooks/useRowSelection'
 
 type DraftState = {
   code: string
@@ -49,6 +54,10 @@ export function CouponsPage() {
   const [draft, setDraft] = useState<DraftState>(emptyDraft)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const push = useToast(s => s.push)
+
+  const couponIds = useMemo(() => coupons.map(c => c.id), [coupons])
+  const sel = useRowSelection<number>(couponIds)
 
   function load() {
     setError(null)
@@ -95,10 +104,34 @@ export function CouponsPage() {
   }
 
   async function remove(c: Coupon) {
-    if (!confirm(`למחוק את ${c.code}?`)) return
+    const ok = await confirmDialog({
+      title: 'מחיקת קופון',
+      message: `למחוק את ${c.code}?`,
+      confirmLabel: 'מחק', danger: true,
+    })
+    if (!ok) return
     try {
       await api(`/api/admin/coupons/${c.id}`, { method: 'DELETE' })
       load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'שגיאה')
+    }
+  }
+
+  async function bulkDelete() {
+    const n = sel.count
+    if (n === 0) return
+    const ok = await confirmBulkDelete(n, {
+      title: `מחיקת ${n} קופונים`,
+      message: 'הקודים יימחקו לצמיתות.',
+    })
+    if (!ok) return
+    try {
+      const res = await api<BulkResult>('/api/admin/coupons/bulk-delete', {
+        method: 'POST', body: JSON.stringify({ ids: sel.selectedList }),
+      })
+      push(`${res.affected} קופונים נמחקו`)
+      sel.clear(); load()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'שגיאה')
     }
@@ -184,6 +217,10 @@ export function CouponsPage() {
       <table className="adm-table">
         <thead>
           <tr>
+            <th className="sel">
+              <Checkbox checked={sel.allSelected} indeterminate={sel.someSelected}
+                        onClick={() => sel.toggleAll()} ariaLabel="בחר הכל" />
+            </th>
             <th>קוד</th>
             <th>הנחה</th>
             <th>מינימום</th>
@@ -194,10 +231,15 @@ export function CouponsPage() {
           </tr>
         </thead>
         <tbody>
-          {coupons.map(c => {
+          {coupons.map((c, index) => {
             const st = statusOf(c)
             return (
-              <tr key={c.id}>
+              <tr key={c.id} className={sel.isSelected(c.id) ? 'selected' : ''}>
+                <td className="sel">
+                  <Checkbox checked={sel.isSelected(c.id)}
+                            onClick={(e) => sel.toggle(index, e.shiftKey)}
+                            ariaLabel={`בחר ${c.code}`} />
+                </td>
                 <td className="num" style={{ fontWeight: 600 }}>{c.code}</td>
                 <td className="num">{valueLabel(c)}</td>
                 <td className="num" style={{ color: 'var(--ink-3)' }}>
@@ -230,12 +272,16 @@ export function CouponsPage() {
             )
           })}
           {coupons.length === 0 && (
-            <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 30 }}>
+            <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 30 }}>
               אין קודים. לחצו "קוד חדש".
             </td></tr>
           )}
         </tbody>
       </table>
+
+      <BulkBar count={sel.count} onClear={sel.clear}>
+        <button className="hm-btn hm-btn-danger" onClick={bulkDelete}>מחיקת נבחרים</button>
+      </BulkBar>
     </>
   )
 }

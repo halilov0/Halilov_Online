@@ -7,7 +7,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -16,6 +18,17 @@ import java.util.List;
 
 @Repository
 public interface AuditLogRepository extends JpaRepository<AuditLog, Long>, JpaSpecificationExecutor<AuditLog> {
+
+    /**
+     * Set-based retention purge. A single {@code DELETE … WHERE created_at <
+     * :cutoff} so we never load rows into memory — the table is the largest
+     * one we keep. Returns the number of rows removed. Must run inside a
+     * transaction (the caller's {@code AuditMaintenanceService} is
+     * {@code @Transactional}).
+     */
+    @Modifying
+    @Query("DELETE FROM AuditLog a WHERE a.createdAt < :cutoff")
+    int deleteOlderThan(@Param("cutoff") Instant cutoff);
 
     default Page<AuditLog> search(Long userId, String action, Instant from, Instant to, Pageable pageable) {
         // Hand-built Specification because Postgres can't infer the type of a

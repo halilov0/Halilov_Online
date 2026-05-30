@@ -6,6 +6,8 @@ import org.springframework.web.bind.annotation.*;
 
 import com.halilov.online.audit.AuditAction;
 import com.halilov.online.audit.AuditService;
+import com.halilov.online.common.BulkIdsRequest;
+import com.halilov.online.common.BulkResult;
 
 import java.util.List;
 
@@ -52,5 +54,14 @@ public class CouponAdminController {
     public void delete(@PathVariable Long id) {
         coupons.adminDelete(id);
         audit.record(AuditAction.COUPON_DELETED, "coupon", id, "קופון נמחק (#" + id + ")");
+    }
+
+    /** Bulk-delete coupons by id. */
+    @PostMapping("/bulk-delete")
+    public BulkResult bulkDelete(@Valid @RequestBody BulkIdsRequest req) {
+        int deleted = coupons.adminDeleteMany(req.ids());
+        audit.record(AuditAction.COUPON_BULK_DELETED, "coupon", null,
+            deleted + " קופונים נמחקו בבת אחת", BulkResult.idsMetadata(req.ids()));
+        return new BulkResult(deleted, req.ids().size() - deleted);
     }
 }
