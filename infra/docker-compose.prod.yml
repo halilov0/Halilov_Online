@@ -47,6 +47,20 @@ services:
       # customers (would let anyone mark their own order PAID without paying).
       # Set PAYMENT_PROVIDER=mock in .env only for staging/QA, "grow" once real.
       PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-disabled}
+      # Where PayPal returns the payer after approval. Empty = falls back to
+      # SITE_BASE_URL (the SPA origin) in the backend config.
+      PAYMENT_RETURN_BASE_URL: ${PAYMENT_RETURN_BASE_URL:-}
+      # PayPal gateway + Green Invoice receipts. Empty until the accounts exist;
+      # baseUrls default to sandbox. At go-live set the creds in .env, point
+      # baseUrls at prod, flip PAYMENT_PROVIDER=paypal.
+      PAYPAL_BASE_URL: ${PAYPAL_BASE_URL:-https://api-m.sandbox.paypal.com}
+      PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-}
+      PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET:-}
+      PAYPAL_WEBHOOK_ID: ${PAYPAL_WEBHOOK_ID:-}
+      PAYPAL_CURRENCY: ${PAYPAL_CURRENCY:-ILS}
+      GREEN_INVOICE_BASE_URL: ${GREEN_INVOICE_BASE_URL:-https://sandbox.d.greeninvoice.co.il/api/v1}
+      GREEN_INVOICE_API_KEY_ID: ${GREEN_INVOICE_API_KEY_ID:-}
+      GREEN_INVOICE_API_KEY_SECRET: ${GREEN_INVOICE_API_KEY_SECRET:-}
       # Admin IPs that skip 2FA (your home/office). 2FA always required for
       # logins from other IPs once an admin enrolls. Leave empty to require
       # 2FA from everywhere.

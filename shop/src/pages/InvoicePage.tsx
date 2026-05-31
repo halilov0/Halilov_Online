@@ -13,6 +13,7 @@ export function InvoicePage() {
   const [searchParams] = useSearchParams()
   const nav = useNavigate()
   const [order, setOrder] = useState<OrderView | null>(null)
+  const [receipt, setReceipt] = useState<{ number: string | null; url: string | null } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [needsLogin, setNeedsLogin] = useState<'unauth' | 'wrong-account' | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
@@ -46,6 +47,15 @@ export function InvoicePage() {
     if (!order) return
     const t = setTimeout(() => window.print(), 250)
     return () => clearTimeout(t)
+  }, [order])
+
+  // The official receipt (קבלה) lives in Green Invoice — fetch its link once
+  // the order is visible. Absent until the order is paid and the קבלה issued.
+  useEffect(() => {
+    if (!order) return
+    api<{ number: string | null; url: string | null }>(`/api/payments/${order.orderNumber}/receipt`)
+      .then(r => { if (r && r.url) setReceipt(r) })
+      .catch(() => { /* tolerate — no official receipt yet */ })
   }, [order])
 
   async function openShare() {
@@ -103,7 +113,13 @@ export function InvoicePage() {
   return (
     <div className="cls-invoice-wrap">
       <div className="cls-invoice-actions no-print">
-        <button onClick={() => window.print()} className="primary">
+        {receipt?.url && (
+          <a href={receipt.url} target="_blank" rel="noopener noreferrer" className="primary">
+            <Icon name="pkg" size={14} stroke={2.2} />
+            הקבלה הרשמית{receipt.number ? ` (${receipt.number})` : ''}
+          </a>
+        )}
+        <button onClick={() => window.print()} className={receipt?.url ? undefined : 'primary'}>
           <Icon name="pkg" size={14} stroke={2.2} />
           הדפס / שמור כ-PDF
         </button>
@@ -144,7 +160,7 @@ export function InvoicePage() {
         </header>
 
         <div className="title-row">
-          <h1>קבלה / חשבונית</h1>
+          <h1>סיכום הזמנה</h1>
           <div className="meta">
             <div><span>מספר</span> <strong className="mono">#{order.orderNumber}</strong></div>
             <div>
@@ -208,7 +224,11 @@ export function InvoicePage() {
         <footer className="ftr">
           <div>תודה שקנית בחלילוב אונליין.</div>
           <div className="fine">
-            מסמך זה הופק אוטומטית ואינו דורש חתימה. בשאלות פנו ל-halilov.store@gmail.com.
+            סיכום זה אינו מסמך מס.{' '}
+            {receipt?.url
+              ? <>הקבלה הרשמית{receipt.number ? ` (${receipt.number})` : ''} נשלחה למייל וזמינה להורדה למעלה.</>
+              : <>הקבלה הרשמית נשלחת למייל לאחר השלמת התשלום.</>}
+            {' '}בשאלות פנו ל-halilov.store@gmail.com.
           </div>
         </footer>
       </article>

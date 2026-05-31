@@ -74,7 +74,38 @@ app:
       password: ${INIT_ADMIN_PASSWORD:admin123!}
       fullName: ${INIT_ADMIN_FULL_NAME:Admin}
   payment:
+    # mock = in-app fake checkout (dev). disabled = hard-stop (prod, until a
+    # real gateway is wired). paypal = PayPal hosted approval (real money).
     provider: ${PAYMENT_PROVIDER:mock}
+    # Absolute base the PayPal approval flow returns to — the SPA's origin.
+    # Falls back to the email siteBaseUrl (prod). Set PAYMENT_RETURN_BASE_URL to
+    # the dev origin (e.g. http://localhost:5173) when testing PayPal locally.
+    returnBaseUrl: ${PAYMENT_RETURN_BASE_URL:${app.email.siteBaseUrl:}}
+    paypal:
+      # PayPal Checkout (server-side Orders v2). clientId + secret from the
+      # PayPal Developer dashboard — sandbox creds are instant + free; live
+      # creds need a verified PayPal Business account. Keep in env, never commit.
+      # baseUrl selects the environment:
+      #   sandbox: https://api-m.sandbox.paypal.com
+      #   prod:    https://api-m.paypal.com
+      baseUrl:      ${PAYPAL_BASE_URL:https://api-m.sandbox.paypal.com}
+      clientId:     ${PAYPAL_CLIENT_ID:}
+      clientSecret: ${PAYPAL_CLIENT_SECRET:}
+      # Webhook id from the dashboard, used to verify webhook signatures so a
+      # forged "payment completed" callback can't flip an order to PAID.
+      webhookId:    ${PAYPAL_WEBHOOK_ID:}
+      currency:     ${PAYPAL_CURRENCY:ILS}
+  greenInvoice:
+    # Green Invoice ("morning") issues the legal קבלה (receipt, doc type 400) on
+    # every successful charge. The GI account MUST be configured as עוסק פטור so
+    # the document carries no VAT. apiKeyId + apiKeySecret from GI Settings → API
+    # — keep in env. baseUrl selects the environment:
+    #   sandbox: https://sandbox.d.greeninvoice.co.il/api/v1
+    #   prod:    https://api.greeninvoice.co.il/api/v1
+    baseUrl:      ${GREEN_INVOICE_BASE_URL:https://sandbox.d.greeninvoice.co.il/api/v1}
+    apiKeyId:     ${GREEN_INVOICE_API_KEY_ID:}
+    apiKeySecret: ${GREEN_INVOICE_API_KEY_SECRET:}
+    documentType: ${GREEN_INVOICE_DOC_TYPE:400}
   delivery:
     courierFlatAgorot: ${DELIVERY_COURIER_AGOROT:1990}
     freeAboveAgorot:   ${DELIVERY_FREE_ABOVE_AGOROT:30000}

@@ -26,6 +26,9 @@ public final class AuditAction {
     public static final String ORDER_STATUS_CHANGED = "ORDER_STATUS_CHANGED";
     public static final String ORDER_REFUNDED      = "ORDER_REFUNDED";
 
+    // payments (gateway-driven, no human actor)
+    public static final String PAYMENT_CAPTURED    = "PAYMENT_CAPTURED";
+
     // catalog (admin)
     public static final String PRODUCT_CREATED     = "PRODUCT_CREATED";
     public static final String PRODUCT_UPDATED     = "PRODUCT_UPDATED";

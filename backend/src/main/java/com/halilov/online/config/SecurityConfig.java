@@ -84,6 +84,10 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET,  "/api/orders/*").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/orders/*/pay").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/payments/mock/*/complete").permitAll()
+                // Auth/guest-token checked in the controller; PayPal webhook is public but signature-verified.
+                .requestMatchers(HttpMethod.POST, "/api/payments/paypal/*/capture").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/payments/paypal/webhook").permitAll()
+                .requestMatchers(HttpMethod.GET,  "/api/payments/*/receipt").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )

@@ -14,6 +14,7 @@ import { CartPage } from './pages/CartPage'
 import { CheckoutPage } from './pages/CheckoutPage'
 import { OrderConfirmationPage } from './pages/OrderConfirmationPage'
 import { MockPaymentPage } from './pages/MockPaymentPage'
+import { PaymentReturnPage } from './pages/PaymentReturnPage'
 import { TrackOrderPage } from './pages/TrackOrderPage'
 import { InvoicePage } from './pages/InvoicePage'
 import { InfoPage } from './pages/InfoPage'
@@ -68,6 +69,8 @@ function App() {
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/orders/:orderNumber" element={<OrderConfirmationPage />} />
         <Route path="/payment/mock" element={<MockPaymentPage />} />
+        <Route path="/payment/return" element={<PaymentReturnPage />} />
+        <Route path="/payment/cancel" element={<PaymentReturnPage />} />
         <Route path="/track" element={<TrackOrderPage />} />
         <Route path="/invoice/:orderNumber" element={<InvoicePage />} />
         <Route path="/about"    element={<InfoPage slug="about" />} />

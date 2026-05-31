@@ -82,7 +82,7 @@ package root (`com.halilov.online`). Each subpackage carries a
 | `favorites`     | Server-backed wishlist for signed-in users (`favorites` table).              |
 | `coupon`        | Discount codes (PERCENT / FIXED), usage counters, validation.                |
 | `order`         | Order lifecycle, addresses, delivery method/pricing, refunds, CSV export.    |
-| `payment`       | Mock payment provider (no real PSP wired up yet — zero PCI scope).           |
+| `payment`       | Payment orchestration + `payments` table. PayPal (Orders v2) capture + Green Invoice קבלה (type 400); `mock`/`disabled` fallbacks. Provider-neutral — see [PAYMENTS_BUILD.md](PAYMENTS_BUILD.md). |
 | `notification`  | Transactional email outbox + builders (order paid, reset, back-in-stock).    |
 | `marketing`     | Opt-in subscriber list, campaign send, one-click unsubscribe.                |
 | `media`         | Local + R2 image storage, on-upload image processing.                        |
@@ -123,30 +123,33 @@ package root (`com.halilov.online`). Each subpackage carries a
 ### 3.2 Order & payment flow
 
 ```
-client                backend                  payment provider
-  │   POST /orders     │                            │
-  │ ─────────────────▶ │  create Order(PENDING),    │
-  │                    │  mint guest_token if guest │
-  │                    │                            │
-  │   POST /orders/{n}/pay
-  │ ─────────────────▶ │  return mock checkout URL  │
-  │                    │ ─────────────────────────▶ │
-  │   redirect ◀────────┴────────────────────────── │
-  │                                                  │
-  │   POST /payments/mock/{n}/complete               │
-  │ ──────────────────────────────────────────────▶ │
-  │                    │ ◀──── completion (mock) ── │
-  │                    │  Order → PAID, decrement   │
-  │                    │  stock, send email, bump   │
-  │                    │  coupon usage              │
+client                backend                    PayPal           Green Invoice
+  │   POST /orders     │                            │                    │
+  │ ─────────────────▶ │  create Order(PENDING),    │                    │
+  │                    │  mint guest_token if guest │                    │
+  │                    │                            │                    │
+  │   POST /orders/{n}/pay                          │                    │
+  │ ─────────────────▶ │  createOrder (Orders v2) ─▶│  payments row      │
+  │                    │  INITIATED + approve URL   │  INITIATED         │
+  │   redirect to PayPal approve ◀───────────────── │                    │
+  │ ══ approve on PayPal ══════════════════════════▶│                    │
+  │   return to /payment/return?token=…&order=…     │                    │
+  │   POST /payments/paypal/{n}/capture             │                    │
+  │ ─────────────────▶ │  capture ─────────────────▶│  (capture id)      │
+  │                    │  Order → PAID, decrement   │                    │
+  │                    │  stock, email, coupon;     │                    │
+  │                    │  payments row PAID         │                    │
+  │                    │  issue קבלה (type 400) ───────────────────────▶ │
+  │                    │  ◀── doc id/number/url ──────────────────────── │
+  │  (signature-verified webhook is a redundant, idempotent confirmation) │
 ```
 
 - **PENDING → PAID** is the *only* transition that decrements stock and
   bumps coupon usage. Cancels/refunds reverse both.
 - **Guest checkout**: an order with no `user_id` gets a random
-  `guest_token` returned once at create time. Anonymous reads + the
-  payment-complete callback require the token via `X-Guest-Token`
-  header (or `?t=` on share links).
+  `guest_token` returned once at create time. Anonymous reads, the
+  capture-on-return call, and the receipt lookup require the token via
+  `X-Guest-Token` header (or `?t=` on the return + share links).
 - **Share token**: a registered user can mint a `share_token` for an
   order they own (idempotent — same token returned on repeat). Lets the
   buyer email the invoice link to an accountant without sharing
@@ -155,6 +158,35 @@ client                backend                  payment provider
   don't own, we return **403 (Forbidden)**, not 404. Distinguishes
   "wrong account" from "wrong order number" in the SPA without leaking
   the owner's identity.
+
+#### Real payments & receipts
+
+Selected by `app.payment.provider`: **`paypal`** (real money), **`mock`** (the
+in-app fake checkout at `/payment/mock`, dev only), or **`disabled`** (hard-stop
+— `/pay` returns 503). Sandbox/go-live status in [PAYMENTS_BUILD.md](PAYMENTS_BUILD.md).
+
+- **Gateway = PayPal** (Orders v2). `POST /orders/{n}/pay` creates the order and
+  returns its payer-approval URL (same `redirectUrl` contract as mock); the SPA
+  redirects, the payer approves, PayPal returns to `/payment/return`, and
+  `POST /payments/paypal/{n}/capture` captures server-side. A signature-verified
+  `POST /payments/paypal/webhook` is a redundant, idempotent confirmation.
+  **Provider-neutral** (`payments.provider` + `app.payment.provider`) so an
+  Israeli gateway can be added later (e.g. for Bit) without touching the
+  order/receipt flow.
+- **System of record = `payments` table** (V20) — one row per money movement
+  (CHARGE/REFUND) plus the receipt it produced. `provider_order_id` = PayPal
+  order id; `provider_txn_id` = capture id. Idempotency anchor: unique
+  `(provider, provider_txn_id)` so a replayed return/webhook can't double-pay or
+  double-issue. The PAID flip + payment-row write happen in one transaction
+  (`PaymentRecorder`); receipt issuance runs **after** that commit.
+- **Legal receipt = Green Invoice (morning)** — issued backend-side as a
+  **קבלה (doc type 400)** when the order goes PAID, with income lines
+  `vatType=EXEMPT`. Halilov is an עוסק פטור, so the document carries **no VAT**
+  and is never a חשבונית מס. A GI outage never fails a paid order
+  (`gi_status` PENDING/FAILED → `ReceiptRetryJob` sweep). The SPA's
+  `/invoice/{n}` is an order **summary** (not a tax doc); the קבלה link is
+  fetched from `GET /payments/{n}/receipt`. PayPal's own invoicing is **not** a
+  valid Israeli קבלה, so it is not used for the legal document.
 
 ### 3.3 Cart
 
@@ -247,7 +279,9 @@ Shop-only:
 - `delivery/deliveryConfig.ts` — *backend-served* delivery config
   cached on the client (single source of truth lives in `delivery_method`
   table; the client just mirrors it via `/api/delivery/config`).
-- `lib/invoicePdf.ts` — client-side PDF render of the invoice.
+- `lib/invoicePdf.ts` — client-side PDF render of the `/invoice/{n}` page, which
+  is an **order summary** (not a tax doc); the official Green Invoice קבלה is
+  linked separately via `GET /api/payments/{n}/receipt`.
 
 Admin-only:
 

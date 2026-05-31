@@ -62,8 +62,12 @@ function guestTokenForPath(path: string): string | null {
   const clean = path.split('?')[0]
   const orderMatch = clean.match(/^\/api\/orders\/([^/]+)(?:\/pay)?$/)
   if (orderMatch) return getGuestOrderToken(orderMatch[1])
-  const payMatch = clean.match(/^\/api\/payments\/mock\/([^/]+)\/complete$/)
-  if (payMatch) return getGuestOrderToken(payMatch[1])
+  const mockMatch = clean.match(/^\/api\/payments\/mock\/([^/]+)\/complete$/)
+  if (mockMatch) return getGuestOrderToken(mockMatch[1])
+  const paypalMatch = clean.match(/^\/api\/payments\/paypal\/([^/]+)\/capture$/)
+  if (paypalMatch) return getGuestOrderToken(paypalMatch[1])
+  const receiptMatch = clean.match(/^\/api\/payments\/([^/]+)\/receipt$/)
+  if (receiptMatch) return getGuestOrderToken(receiptMatch[1])
   return null
 }
 

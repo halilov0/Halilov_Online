@@ -353,16 +353,7 @@ public class OrderService {
 
         // Decrement stock once on PENDING -> PAID
         if (old == OrderStatus.PENDING && newStatus == OrderStatus.PAID) {
-            for (OrderItem oi : order.getItems()) {
-                Product p = products.findById(oi.getProductId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
-                        "product missing: " + oi.getProductId()));
-                if (p.getStockQty() < oi.getQuantity()) {
-                    throw new ResponseStatusException(HttpStatus.CONFLICT,
-                        "not enough stock to fulfill: " + p.getNameHe());
-                }
-                p.setStockQty(p.getStockQty() - oi.getQuantity());
-            }
+            decrementStockForPaid(order);
             order.setPaidAt(java.time.Instant.now());
         }
 
@@ -373,17 +364,84 @@ public class OrderService {
             ? addresses.findById(order.getShippingAddressId()).orElse(null) : null;
 
         if (old == OrderStatus.PENDING && newStatus == OrderStatus.PAID) {
-            if (order.getCouponCode() != null) {
-                try {
-                    couponService.incrementUsage(order.getCouponCode());
-                } catch (Exception e) {
-                    log.warn("failed to bump coupon usage for {}: {}", order.getOrderNumber(), e.toString());
-                }
-            }
-            sendOrderPaidEmail(order, addr);
+            afterPaidCommit(order, addr);
         }
 
         return OrderDtos.OrderView.from(order, addr);
+    }
+
+    /**
+     * Gateway-driven PAID flip — invoked from the payment package once a charge
+     * is captured (PayPal return + signed webhook), not from an admin/human
+     * request. Same side effects as the admin PENDING→PAID transition (stock
+     * decrement, coupon bump, paid email) but idempotent (only fires from
+     * PENDING) and audited as a {@code PAYMENT} actor since there is no
+     * SecurityContext on a webhook/return. {@code providerRef} = the capture id,
+     * mirrored onto {@code orders.payment_ref}.
+     */
+    @Transactional
+    public void markPaidByPayment(String orderNumber, String providerRef) {
+        Order order = orders.findByOrderNumber(orderNumber)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "order not found"));
+        if (order.getStatus() != OrderStatus.PENDING) {
+            return; // already paid / cancelled — idempotent no-op
+        }
+        decrementStockForPaid(order);
+        order.setStatus(OrderStatus.PAID);
+        order.setPaidAt(java.time.Instant.now());
+        if (providerRef != null && !providerRef.isBlank()) {
+            order.setPaymentRef(providerRef);
+        }
+        Address addr = addressOf(order);
+        BuyerContact buyer = resolveBuyer(order, addr);
+        audit.recordAs(order.getUserId(), buyer != null ? buyer.email() : null, "PAYMENT",
+            AuditAction.PAYMENT_CAPTURED, "order", order.getOrderNumber(),
+            "תשלום אושר: " + order.getOrderNumber()
+                + (providerRef != null ? " (txn " + providerRef + ")" : ""), null);
+        afterPaidCommit(order, addr);
+    }
+
+    private void decrementStockForPaid(Order order) {
+        for (OrderItem oi : order.getItems()) {
+            Product p = products.findById(oi.getProductId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
+                    "product missing: " + oi.getProductId()));
+            if (p.getStockQty() < oi.getQuantity()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "not enough stock to fulfill: " + p.getNameHe());
+            }
+            p.setStockQty(p.getStockQty() - oi.getQuantity());
+        }
+    }
+
+    private void afterPaidCommit(Order order, Address addr) {
+        if (order.getCouponCode() != null) {
+            try {
+                couponService.incrementUsage(order.getCouponCode());
+            } catch (Exception e) {
+                log.warn("failed to bump coupon usage for {}: {}", order.getOrderNumber(), e.toString());
+            }
+        }
+        sendOrderPaidEmail(order, addr);
+    }
+
+    /** Everything the receipt issuer (Green Invoice) needs for one paid order. */
+    public record ReceiptContext(Order order, Address address, String buyerEmail, String buyerName) {}
+
+    /**
+     * Resolve the receipt context for a paid order by its DB id (the
+     * {@code payments.order_id}). Read-only; order line items are eager so the
+     * returned entity stays usable for building the GI document.
+     */
+    @Transactional(readOnly = true)
+    public ReceiptContext receiptContext(Long orderId) {
+        Order order = orders.findById(orderId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "order not found"));
+        Address addr = addressOf(order);
+        BuyerContact buyer = resolveBuyer(order, addr);
+        return new ReceiptContext(order, addr,
+            buyer != null ? buyer.email() : null,
+            buyer != null ? buyer.name() : null);
     }
 
     /**

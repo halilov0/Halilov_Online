@@ -591,7 +591,7 @@ export function CheckoutPage() {
               </button>
               <div className="secure-note">
                 <Icon name="secure" size={16} />
-                תשלום מאובטח · Grow / Meshulam
+                תשלום מאובטח · PayPal
               </div>
             </aside>
           </div>

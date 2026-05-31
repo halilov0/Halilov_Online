@@ -59,7 +59,7 @@ and why. Quick map:
 | `favorites`    | Server-backed wishlist (per-user set of product ids) for authenticated users. |
 | `coupon`       | Discount codes (PERCENT / FIXED) and usage tracking.                 |
 | `order`        | Order lifecycle, addresses, refunds, CSV export, delivery pricing.   |
-| `payment`      | Mock payment provider (zero PCI scope).                              |
+| `payment`      | PayPal Orders-v2 charge + capture, Green Invoice קבלה, `payments` table. |
 | `notification` | Email outbox + builders (transactional). Brevo or stdout transport.  |
 | `marketing`    | Opt-in list, campaign send, unsubscribe link.                        |
 | `media`        | Image storage interface (local disk + Cloudflare R2).                |
@@ -85,7 +85,10 @@ ones:
 | `BREVO_API_KEY`         | Brevo API key when `EMAIL_PROVIDER=brevo`.                    |
 | `MEDIA_STORAGE`         | `local` (disk) or `r2` (Cloudflare).                          |
 | `R2_*`                  | R2 endpoint, keys, bucket, public base URL.                   |
-| `PAYMENT_PROVIDER`      | Currently only `mock` is wired up.                            |
+| `PAYMENT_PROVIDER`      | `paypal` (real) / `mock` (dev fake checkout) / `disabled` (prod hard-stop). |
+| `PAYMENT_RETURN_BASE_URL` | SPA origin PayPal returns the payer to. Empty → falls back to `SITE_BASE_URL`. |
+| `PAYPAL_*`              | PayPal Orders-v2 creds (baseUrl, clientId, secret, webhookId, currency). Sandbox by default — see [PAYMENTS_BUILD.md](../PAYMENTS_BUILD.md). |
+| `GREEN_INVOICE_*`       | Green Invoice (morning) API id+secret + baseUrl for the legal קבלה (type 400, no VAT). |
 | `SITE_BASE_URL`         | Used in outgoing email links (e.g. order-paid receipt).       |
 | `INIT_ADMIN_*`          | First-boot seeded admin user. Overwrite before going public.  |
 
