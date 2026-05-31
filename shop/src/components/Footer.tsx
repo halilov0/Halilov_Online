@@ -82,7 +82,7 @@ export function Footer() {
       </div>
 
       <div className="cls-footer-bottom">
-        <span>© {new Date().getFullYear()} חלילוב אונליין. כל הזכויות שמורות.</span>
+        <span>© {new Date().getFullYear()} חלילוב אונליין · עוסק פטור 325350643. כל הזכויות שמורות.</span>
         <div className="pays">
           <span className="pay-chip">VISA</span>
           <span className="pay-chip">MASTERCARD</span>

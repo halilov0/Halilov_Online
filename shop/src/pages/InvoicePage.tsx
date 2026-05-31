@@ -138,8 +138,7 @@ export function InvoicePage() {
           </div>
           <div className="biz">
             <div>חלילוב אונליין</div>
-            {/* TODO(business-number): replace with `עוסק פטור {number}` once רשות המסים registration completes. */}
-            <div>עוסק פטור</div>
+            <div>עוסק פטור 325350643</div>
             <div>halilov.store@gmail.com</div>
           </div>
         </header>
