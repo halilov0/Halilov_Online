@@ -266,13 +266,10 @@ export function OrderDetailPage() {
           <div className="adm-card">
             <div className="hm-label" style={{ marginBottom: 10 }}>תשלום</div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13 }}>
-              <span>Grow / Meshulam</span>
+              <span>PayPal</span>
               <StatusPill s={order.status} />
             </div>
-            <hr className="hm-rule" />
-            <div className="mono" style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
-              Webhook אמיתי יחובר כשנפעיל את Grow
-            </div>
+            <ReceiptSection order={order} onUpdated={setOrder} />
           </div>
         </div>
       </div>
@@ -290,6 +287,93 @@ function Row({ k, v, muted }: { k: string; v: string; muted?: boolean }) {
 
 function canRefund(s: OrderStatus): boolean {
   return s === 'PAID' || s === 'FULFILLED' || s === 'SHIPPED' || s === 'DELIVERED'
+}
+
+const RECEIPTABLE: OrderStatus[] = ['PAID', 'FULFILLED', 'SHIPPED', 'DELIVERED']
+
+/**
+ * Manual קבלה tracking for the lean launch (no automated Green Invoice API yet).
+ * The admin issues the receipt by hand in morning, then records its number (and
+ * an optional public link) here — which marks the charge ISSUED so a later
+ * GI-API switch won't re-issue a duplicate, and lights up the receipt link on
+ * the customer's invoice page.
+ */
+function ReceiptSection({ order, onUpdated }: { order: OrderView; onUpdated: (o: OrderView) => void }) {
+  const issued = !!order.invoiceNumber
+  const receiptable = RECEIPTABLE.includes(order.status)
+  const [open, setOpen] = useState(false)
+  const [number, setNumber] = useState('')
+  const [url, setUrl] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  if (!issued && !receiptable) return null
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!number.trim()) { setErr('מספר קבלה חובה'); return }
+    setSubmitting(true); setErr(null)
+    try {
+      const updated = await api<OrderView>(`/api/admin/orders/${order.orderNumber}/receipt`, {
+        method: 'POST',
+        body: JSON.stringify({ number: number.trim(), url: url.trim() || undefined }),
+      })
+      onUpdated(updated)
+      setOpen(false); setUrl('')
+    } catch (e2) {
+      setErr(e2 instanceof Error ? e2.message : 'שגיאה')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <>
+      <hr className="hm-rule" />
+      <div className="hm-label" style={{ marginBottom: 8 }}>קבלה (Green Invoice)</div>
+      {!open ? (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13 }}>
+          {issued
+            ? <span>נשלחה · <span className="mono">{order.invoiceNumber}</span></span>
+            : <span style={{ color: 'var(--terracotta)' }}>ממתין לקבלה ידנית</span>}
+          <button
+            className="hm-btn hm-btn-quiet"
+            style={{ padding: '4px 10px', fontSize: 12 }}
+            onClick={() => { setNumber(order.invoiceNumber ?? ''); setErr(null); setOpen(true) }}
+          >
+            {issued ? 'עדכן' : 'סמן נשלחה'}
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={submit} style={{ display: 'grid', gap: 8 }}>
+          <input
+            className="hm-input mono"
+            placeholder="מספר קבלה"
+            value={number}
+            onChange={e => setNumber(e.target.value)}
+            maxLength={64}
+            required
+          />
+          <input
+            className="hm-input"
+            placeholder="קישור לקבלה (אופציונלי)"
+            value={url}
+            onChange={e => setUrl(e.target.value)}
+            maxLength={1024}
+          />
+          {err && <div className="hm-error">{err}</div>}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button type="button" className="hm-btn hm-btn-quiet" onClick={() => { setOpen(false); setErr(null) }} disabled={submitting}>
+              ביטול
+            </button>
+            <button type="submit" className="hm-btn hm-btn-primary" disabled={submitting}>
+              {submitting ? 'שומר…' : 'שמירה'}
+            </button>
+          </div>
+        </form>
+      )}
+    </>
+  )
 }
 
 function RefundModal({ order, onClose, onDone }: {

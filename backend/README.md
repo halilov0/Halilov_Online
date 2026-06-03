@@ -88,7 +88,8 @@ ones:
 | `PAYMENT_PROVIDER`      | `paypal` (real) / `mock` (dev fake checkout) / `disabled` (prod hard-stop). |
 | `PAYMENT_RETURN_BASE_URL` | SPA origin PayPal returns the payer to. Empty → falls back to `SITE_BASE_URL`. |
 | `PAYPAL_*`              | PayPal Orders-v2 creds (baseUrl, clientId, secret, webhookId, currency). Sandbox by default — see [PAYMENTS_BUILD.md](../PAYMENTS_BUILD.md). |
-| `GREEN_INVOICE_*`       | Green Invoice (morning) API id+secret + baseUrl for the legal קבלה (type 400, no VAT). |
+| `GREEN_INVOICE_*`       | Green Invoice (morning) API id+secret + baseUrl for the legal קבלה (type 400, no VAT). Empty at launch — receipts issued manually (the API needs a paid plan). |
+| `RECEIPT_MANUAL_NOTICE` | `true` makes the paid-order email say the official קבלה arrives within a business day (manual launch). `false` once the GI API is enabled. |
 | `SITE_BASE_URL`         | Used in outgoing email links (e.g. order-paid receipt).       |
 | `INIT_ADMIN_*`          | First-boot seeded admin user. Overwrite before going public.  |
 

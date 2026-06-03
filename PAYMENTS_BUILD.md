@@ -1,12 +1,14 @@
 # Payments & Receipts — Build Handoff
 
-> **Status: Phases 1–4b PROVEN e2e in SANDBOX.** Full browser flow passed locally:
-> card-first checkout → PayPal approve → server capture → idempotent PAID → Green
-> Invoice קבלה (#80003) → payment row + order `invoice_number` mirror + retry sweep
-> + receipt link to the SPA. Local dev runs `PAYMENT_PROVIDER=paypal` against
-> PayPal+GI sandbox; prod still `disabled`. **Remaining: Phase 5 go-live** (live
-> PayPal Business creds + webhook id, flip to prod URLs) and Phase 6 refunds.
-> Changes **uncommitted** (one feature commit later). _Last updated: 2026-06-01._
+> **Status: Phases 1–4b PROVEN e2e in SANDBOX; COMMITTED (`451e4b3`) + DARK-DEPLOYED
+> to prod** (code live, `PAYMENT_PROVIDER=disabled` → inert). Sandbox browser flow
+> passed: card-first checkout → PayPal approve → server capture → idempotent PAID →
+> Green Invoice קבלה (#80003) → payment row + order `invoice_number` mirror + retry
+> sweep + receipt link to the SPA. **Launch decision (2026-06-03): MANUAL receipts.**
+> Green Invoice's API needs a paid plan, so at launch the GI creds stay empty and the
+> קבלה is issued by hand (see "Manual receipt mode" below); payments still go live on
+> PayPal. **Remaining: Phase 5 go-live** (live PayPal creds + flip URLs) and Phase 6
+> (refunds + switch receipts back to the GI API). _Last updated: 2026-06-03._
 >
 > **Bugs found + fixed during the sandbox e2e (all in this uncommitted change):**
 > 1. V20 `currency CHAR(3)` → `VARCHAR(3)` — Hibernate `ddl-auto: validate`
@@ -36,7 +38,9 @@ into Halilov Online. Permanent architecture lives in [ARCHITECTURE.md](ARCHITECT
 - **Receipt = Green Invoice ("morning")** — our backend issues a **קבלה (doc type
   400)** when an order goes PAID. Halilov is an **עוסק פטור** ⇒ **no VAT**, never a
   חשבונית מס. **PayPal Invoicing is NOT a valid Israeli קבלה — do not use it** for
-  the legal document (free, but not רשות-המסים-compliant).
+  the legal document (free, but not רשות-המסים-compliant). _Launch issues the קבלה
+  **manually** (the GI API needs a paid plan); backend auto-issuance is fully wired
+  and turns on by just adding the GI creds — see "Manual receipt mode"._
 - **Provider-neutral** design: `payments.provider` column + `app.payment.provider`
   switch. An Israeli gateway (for Bit) can be slotted in later with no order/receipt
   rework.
@@ -53,8 +57,10 @@ into Halilov Online. Permanent architecture lives in [ARCHITECTURE.md](ARCHITECT
 3. **PayPal live** (for go-live, Phase 5) — verified **PayPal Business** account;
    create a live app → live Client ID + Secret; register a webhook on
    `https://halilov.co.il/api/payments/paypal/webhook` → note the **Webhook ID**.
-4. **Green Invoice live** — confirm the production account is set as **עוסק פטור
-   325350643 / עידן חלילוב**, Hebrew + ILS; generate prod key id + secret.
+4. ~~**Green Invoice live** — prod key id + secret.~~ **Deferred — manual receipts at
+   launch** (the GI API needs a paid plan). Account stays **עוסק פטור 325350643 /
+   עידן חלילוב**; receipts are issued by hand until volume justifies the API plan
+   (see "Manual receipt mode"). Switch back later with no code change.
 
 > Creds live in `infra/.env` only (gitignored) — never committed.
 
@@ -114,14 +120,54 @@ on `gi_status IN ('PENDING','FAILED')`.
 - [x] **4b. Legal wording** — `InvoicePage` title → `סיכום הזמנה`, fine print says
   "not a tax document", and a **הקבלה הרשמית** button links the GI doc via new
   `GET /api/payments/{n}/receipt`.
-- [ ] **5. Go-live**
-  - Prod `.env`: set live creds, `PAYPAL_BASE_URL=https://api-m.paypal.com`,
-    `GREEN_INVOICE_BASE_URL=https://api.greeninvoice.co.il/api/v1`, flip
-    `PAYMENT_PROVIDER=paypal`, redeploy. Do **one ₪-small real end-to-end charge**,
-    confirm the קבלה issued, then open.
+- [ ] **5. Go-live (manual receipts)**
+  - Prod `.env`: set live **PayPal** creds + `PAYPAL_WEBHOOK_ID`,
+    `PAYPAL_BASE_URL=https://api-m.paypal.com`,
+    `PAYMENT_RETURN_BASE_URL=https://halilov.co.il`, `RECEIPT_MANUAL_NOTICE=true`,
+    flip `PAYMENT_PROVIDER=paypal`, redeploy. **Leave the GI creds empty** (manual
+    receipts — see "Manual receipt mode"). Do **one ₪-small real end-to-end charge**,
+    confirm PAID + the "within a business day" email, then issue the קבלה by hand and
+    mark it on the order before opening.
 - [ ] **6. Refunds (later)**
   - On `REFUNDED`: PayPal refund `POST /v2/payments/captures/{capture_id}/refund` +
     GI **credit document**; insert a `REFUND` payments row.
+
+---
+
+## Manual receipt mode (lean launch — current)
+
+Green Invoice's **API** requires a paid plan, so for launch we **defer automated
+issuance** and create the קבלה **by hand** in morning's free tier. Payments still go
+live on PayPal — only receipt issuance is manual. The code needs **no special flag**
+for issuance: with the GI creds empty, `ReceiptService` and `ReceiptRetryJob` no-op
+(`gi.isConfigured()` guards), so a captured charge sits `gi_status=PENDING` with no
+errors and no retry storm.
+
+**Flow:**
+1. Customer pays → order PAID → confirmation email. With `RECEIPT_MANUAL_NOTICE=true`
+   the email adds *"הקבלה הרשמית תישלח אליך במייל בנפרד תוך יום עסקים."*
+2. Admin worklist: the orders list flags paid orders missing a receipt
+   ("N ממתינות לקבלה" + a `קבלה` chip per row); the order page shows "ממתין לקבלה ידנית".
+3. Admin issues the קבלה by hand in morning, emails it to the customer, then records
+   it on the order page (**סמן נשלחה** → number + optional public link):
+   `POST /api/admin/orders/{n}/receipt` → `PaymentService.adminMarkReceipt` →
+   `markGiIssued` flips the charge to `gi_status=ISSUED`, mirrors the number to
+   `orders.invoice_number`, and (if a URL was given) lights up the **הקבלה הרשמית**
+   link on the invoice page. Audited as `RECEIPT_ISSUED_MANUAL`.
+
+**Config:** leave `GREEN_INVOICE_API_KEY_ID/SECRET` empty + set `RECEIPT_MANUAL_NOTICE=true`.
+
+**Legal note:** strict law issues the קבלה *at* payment; a daily ≤24h manual batch is
+common for small עוסקים but not strictly by-the-book. The automated GI path is the
+compliant version — this is a deliberate, reversible cost trade.
+
+### Switching back to the automated GI API (later)
+1. **First** mark every already-hand-issued paid order as ISSUED (via **סמן נשלחה**)
+   — otherwise step 3 re-issues them as **duplicate קבלות**.
+2. Fill `GREEN_INVOICE_API_KEY_ID/SECRET` (+ `GREEN_INVOICE_BASE_URL` prod), set
+   `RECEIPT_MANUAL_NOTICE=false`, redeploy.
+3. `ReceiptRetryJob` auto-issues any remaining `gi_status=PENDING` charges; new orders
+   issue instantly on PAID. Nothing else changes.
 
 ---
 

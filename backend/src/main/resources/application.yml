@@ -106,6 +106,12 @@ app:
     apiKeyId:     ${GREEN_INVOICE_API_KEY_ID:}
     apiKeySecret: ${GREEN_INVOICE_API_KEY_SECRET:}
     documentType: ${GREEN_INVOICE_DOC_TYPE:400}
+  receipt:
+    # When true, the paid-order email tells the buyer the official קבלה will be
+    # emailed by hand within a business day — the lean launch flow while the
+    # Green Invoice API plan is deferred. Flip to false once GI API issuance is
+    # enabled so the email reflects instant issuance.
+    manualNotice: ${RECEIPT_MANUAL_NOTICE:false}
   delivery:
     courierFlatAgorot: ${DELIVERY_COURIER_AGOROT:1990}
     freeAboveAgorot:   ${DELIVERY_FREE_ABOVE_AGOROT:30000}

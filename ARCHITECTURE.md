@@ -186,7 +186,11 @@ in-app fake checkout at `/payment/mock`, dev only), or **`disabled`** (hard-stop
   (`gi_status` PENDING/FAILED → `ReceiptRetryJob` sweep). The SPA's
   `/invoice/{n}` is an order **summary** (not a tax doc); the קבלה link is
   fetched from `GET /payments/{n}/receipt`. PayPal's own invoicing is **not** a
-  valid Israeli קבלה, so it is not used for the legal document.
+  valid Israeli קבלה, so it is not used for the legal document. **Launch runs in
+  manual-receipt mode** (the GI API needs a paid plan): with the GI creds empty,
+  auto-issuance no-ops and the admin records a hand-issued קבלה via
+  `POST /api/admin/orders/{n}/receipt` (marks the charge ISSUED so the API,
+  when later enabled, won't duplicate it). See [PAYMENTS_BUILD.md](PAYMENTS_BUILD.md).
 
 ### 3.3 Cart
 

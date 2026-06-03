@@ -70,6 +70,7 @@ public class OrderService {
     private final AuditService audit;
     private final String adminBcc;
     private final String siteBaseUrl;
+    private final boolean manualReceiptNotice;
 
     public OrderService(OrderRepository orders, AddressRepository addresses,
                         ProductRepository products, UserRepository users,
@@ -78,7 +79,8 @@ public class OrderService {
                         EmailService emailService,
                         AuditService audit,
                         @Value("${app.email.adminBcc:}") String adminBcc,
-                        @Value("${app.email.siteBaseUrl:}") String siteBaseUrl) {
+                        @Value("${app.email.siteBaseUrl:}") String siteBaseUrl,
+                        @Value("${app.receipt.manualNotice:false}") boolean manualReceiptNotice) {
         this.orders = orders;
         this.addresses = addresses;
         this.products = products;
@@ -89,6 +91,7 @@ public class OrderService {
         this.audit = audit;
         this.adminBcc = adminBcc;
         this.siteBaseUrl = siteBaseUrl;
+        this.manualReceiptNotice = manualReceiptNotice;
     }
 
     @Transactional
@@ -620,7 +623,7 @@ public class OrderService {
                 buyer.email(),
                 buyer.name(),
                 OrderEmailBuilder.subject(order),
-                OrderEmailBuilder.html(order, addr, buyer.name(), siteBaseUrl),
+                OrderEmailBuilder.html(order, addr, buyer.name(), siteBaseUrl, manualReceiptNotice),
                 bcc
             ));
         } catch (Exception e) {

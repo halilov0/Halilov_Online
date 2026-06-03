@@ -28,6 +28,8 @@ public final class AuditAction {
 
     // payments (gateway-driven, no human actor)
     public static final String PAYMENT_CAPTURED    = "PAYMENT_CAPTURED";
+    // receipt marked manually by an admin (lean launch — no automated GI API yet)
+    public static final String RECEIPT_ISSUED_MANUAL = "RECEIPT_ISSUED_MANUAL";
 
     // catalog (admin)
     public static final String PRODUCT_CREATED     = "PRODUCT_CREATED";

@@ -14,7 +14,8 @@ public final class OrderEmailBuilder {
         return "אישור הזמנה " + order.getOrderNumber() + " - חלילוב אונליין";
     }
 
-    public static String html(Order order, Address shipping, String customerName, String siteBaseUrl) {
+    public static String html(Order order, Address shipping, String customerName, String siteBaseUrl,
+                              boolean manualReceiptNotice) {
         StringBuilder rows = new StringBuilder();
         for (OrderItem oi : order.getItems()) {
             rows.append("<tr>")
@@ -40,6 +41,9 @@ public final class OrderEmailBuilder {
             + "<tr><td style=\"padding:24px;direction:rtl;text-align:right\">"
             + "<h2 style=\"margin:0 0 8px 0;font-size:20px;direction:rtl;text-align:right\">תודה על ההזמנה, " + escape(customerName) + "!</h2>"
             + "<p style=\"margin:0 0 16px 0;color:#555;direction:rtl;text-align:right\">קיבלנו את התשלום וההזמנה שלך בעיבוד.</p>"
+            + (manualReceiptNotice
+                ? "<p style=\"margin:0 0 16px 0;color:#555;direction:rtl;text-align:right\">הקבלה הרשמית תישלח אליך במייל בנפרד תוך יום עסקים.</p>"
+                : "")
             + "<p style=\"margin:0 0 16px 0;direction:rtl;text-align:right\"><strong>מספר הזמנה:</strong> <span style=\"font-family:monospace\">" + escape(order.getOrderNumber()) + "</span></p>"
             + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" dir=\"rtl\" style=\"border-collapse:collapse;margin:16px 0;direction:rtl\">"
             + "<thead><tr style=\"background:#fafafa\">"

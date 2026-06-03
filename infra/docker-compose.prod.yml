@@ -61,6 +61,9 @@ services:
       GREEN_INVOICE_BASE_URL: ${GREEN_INVOICE_BASE_URL:-https://sandbox.d.greeninvoice.co.il/api/v1}
       GREEN_INVOICE_API_KEY_ID: ${GREEN_INVOICE_API_KEY_ID:-}
       GREEN_INVOICE_API_KEY_SECRET: ${GREEN_INVOICE_API_KEY_SECRET:-}
+      # true = paid-order email says the official קבלה is sent by hand within a
+      # business day (manual launch flow; GI API deferred). false once GI API on.
+      RECEIPT_MANUAL_NOTICE: ${RECEIPT_MANUAL_NOTICE:-false}
       # Admin IPs that skip 2FA (your home/office). 2FA always required for
       # logins from other IPs once an admin enrolls. Leave empty to require
       # 2FA from everywhere.

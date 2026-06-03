@@ -84,6 +84,7 @@ public class OrderDtos {
         List<OrderItemView> items, ShippingView shipping, Instant createdAt,
         Instant cancelledAt, String cancellationReason, String cancelledBy,
         Instant refundedAt, Integer refundAmountAgorot,
+        String invoiceNumber,
         DeliveryMethod deliveryMethod,
         String guestEmail,
         // Only set on the create-order response for guest checkouts — lets the
@@ -105,6 +106,7 @@ public class OrderDtos {
                 ShippingView.from(a), o.getCreatedAt(),
                 o.getCancelledAt(), o.getCancellationReason(), o.getCancelledBy(),
                 o.getRefundedAt(), o.getRefundAmountAgorot(),
+                o.getInvoiceNumber(),
                 o.getDeliveryMethod(),
                 o.getGuestEmail(),
                 includeGuestToken ? o.getGuestToken() : null

@@ -1,5 +1,8 @@
 package com.halilov.online.payment;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
 /**
  * Records exchanged with {@link PaymentController}.
  *
@@ -31,6 +34,16 @@ public final class PaymentDtos {
     public record ReceiptInfo(
         String number,
         String url
+    ) {}
+
+    /**
+     * Admin records a manually-issued Green Invoice קבלה for a paid order
+     * (lean launch — receipts created by hand until the GI API is enabled).
+     * {@code url} is optional: when present the invoice page links the קבלה.
+     */
+    public record ManualReceiptRequest(
+        @NotBlank @Size(max = 64) String number,
+        @Size(max = 1024) String url
     ) {}
 
     private PaymentDtos() {}

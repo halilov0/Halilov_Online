@@ -16,6 +16,10 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'CANCELLED', label: 'בוטלו' },
 ]
 
+// Paid states that should carry a קבלה (receipt). Used to flag orders still
+// awaiting the manual קבלה during the lean launch.
+const RECEIPTABLE: OrderStatus[] = ['PAID', 'FULFILLED', 'SHIPPED', 'DELIVERED']
+
 export function OrdersPage() {
   const [orders, setOrders] = useState<OrderView[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +38,11 @@ export function OrdersPage() {
     return c
   }, [orders])
 
+  const awaitingReceipt = useMemo(
+    () => orders.filter(o => !o.invoiceNumber && RECEIPTABLE.includes(o.status)).length,
+    [orders],
+  )
+
   const filtered = useMemo(() => {
     const list = tab === 'all' ? orders : orders.filter(o => o.status === tab)
     return [...list].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -47,6 +56,7 @@ export function OrdersPage() {
           <div className="sub">
             {orders.length} הזמנות
             {counts.PENDING > 0 && ` · ${counts.PENDING} ממתינות לטיפול`}
+            {awaitingReceipt > 0 && ` · ${awaitingReceipt} ממתינות לקבלה`}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -144,7 +154,17 @@ export function OrdersPage() {
                   </div>
                 </td>
                 <td className="num">{o.items.reduce((s, i) => s + i.quantity, 0)}</td>
-                <td><StatusPill s={o.status} /></td>
+                <td>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <StatusPill s={o.status} />
+                    {!o.invoiceNumber && RECEIPTABLE.includes(o.status) && (
+                      <span title="ממתין לקבלה ידנית" style={{
+                        fontSize: 10, padding: '1px 6px', borderRadius: 'var(--r-pill)',
+                        background: 'var(--terra-soft)', color: 'var(--terracotta)', whiteSpace: 'nowrap',
+                      }}>קבלה</span>
+                    )}
+                  </div>
+                </td>
                 <td className="num" style={{ textAlign: 'start', fontWeight: 600 }}>{formatPrice(o.totalAgorot)}</td>
                 <td onClick={e => e.stopPropagation()}>
                   <Link to={`/orders/${o.orderNumber}`} className="hm-btn hm-btn-quiet"

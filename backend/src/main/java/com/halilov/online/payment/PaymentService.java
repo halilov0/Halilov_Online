@@ -9,6 +9,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.halilov.online.audit.AuditAction;
+import com.halilov.online.audit.AuditService;
 import com.halilov.online.order.Order;
 import com.halilov.online.order.OrderRepository;
 import com.halilov.online.order.OrderService;
@@ -41,9 +43,11 @@ public class PaymentService {
     private final PayPalClient paypal;
     private final PaymentRecorder recorder;
     private final ReceiptService receiptService;
+    private final AuditService audit;
     private final ObjectMapper mapper = new ObjectMapper();
     private final String provider;
     private final String returnBaseUrl;
+    private final int giDocumentType;
 
     public PaymentService(
         OrderRepository orders,
@@ -52,8 +56,10 @@ public class PaymentService {
         PayPalClient paypal,
         PaymentRecorder recorder,
         ReceiptService receiptService,
+        AuditService audit,
         @Value("${app.payment.provider:mock}") String provider,
-        @Value("${app.payment.returnBaseUrl:}") String returnBaseUrl
+        @Value("${app.payment.returnBaseUrl:}") String returnBaseUrl,
+        @Value("${app.greenInvoice.documentType:400}") int giDocumentType
     ) {
         this.orders = orders;
         this.users = users;
@@ -61,8 +67,10 @@ public class PaymentService {
         this.paypal = paypal;
         this.recorder = recorder;
         this.receiptService = receiptService;
+        this.audit = audit;
         this.provider = provider;
         this.returnBaseUrl = returnBaseUrl == null ? "" : returnBaseUrl.replaceAll("/+$", "");
+        this.giDocumentType = giDocumentType;
     }
 
     // ── initiate ──────────────────────────────────────────────────────────────
@@ -172,6 +180,35 @@ public class PaymentService {
             .filter(p -> p.getGiStatus() == GiStatus.ISSUED && p.getGiDocUrl() != null)
             .map(p -> new PaymentDtos.ReceiptInfo(p.getGiDocNumber(), p.getGiDocUrl()))
             .orElse(new PaymentDtos.ReceiptInfo(null, null));
+    }
+
+    // ── admin (manual receipt) ───────────────────────────────────────────────────
+
+    /**
+     * Admin records a manually-issued Green Invoice קבלה for a PAID order. The
+     * lean launch issues receipts by hand in morning's free tier (the automated
+     * API needs a paid plan), so the charge sits {@code gi_status=PENDING} after
+     * capture; this stores the doc number/url and flips it to {@code ISSUED}.
+     * Marking ISSUED also stops {@link ReceiptRetryJob} from re-issuing it as a
+     * duplicate קבלה once the GI API is later enabled.
+     */
+    public void adminMarkReceipt(String orderNumber, String number, String url) {
+        String num = number == null ? null : number.trim();
+        if (num == null || num.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "receipt number required");
+        }
+        Order order = orders.findByOrderNumber(orderNumber)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "order not found"));
+        Payment charge = recorder.latestCharge(order.getId())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
+                "no payment recorded for this order"));
+        if (charge.getStatus() != PaymentStatus.PAID) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "order is not paid");
+        }
+        String link = (url == null || url.isBlank()) ? null : url.trim();
+        recorder.markGiIssued(charge.getId(), null, num, giDocumentType, link);
+        audit.record(AuditAction.RECEIPT_ISSUED_MANUAL, "order", orderNumber,
+            "קבלה ידנית סומנה: " + num);
     }
 
     // ── webhook (signed, public) ──────────────────────────────────────────────

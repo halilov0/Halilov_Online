@@ -135,6 +135,7 @@ export type OrderView = {
   cancelledAt: string | null; cancellationReason: string | null
   cancelledBy: 'CUSTOMER' | 'ADMIN' | 'SYSTEM' | null
   refundedAt: string | null; refundAmountAgorot: number | null
+  invoiceNumber: string | null
 }
 
 export type RefundRequest = {
