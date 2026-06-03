@@ -1,14 +1,13 @@
 # Payments & Receipts — Build Handoff
 
-> **Status: Phases 1–4b PROVEN e2e in SANDBOX; COMMITTED (`451e4b3`) + DARK-DEPLOYED
-> to prod** (code live, `PAYMENT_PROVIDER=disabled` → inert). Sandbox browser flow
-> passed: card-first checkout → PayPal approve → server capture → idempotent PAID →
-> Green Invoice קבלה (#80003) → payment row + order `invoice_number` mirror + retry
-> sweep + receipt link to the SPA. **Launch decision (2026-06-03): MANUAL receipts.**
-> Green Invoice's API needs a paid plan, so at launch the GI creds stay empty and the
-> קבלה is issued by hand (see "Manual receipt mode" below); payments still go live on
-> PayPal. **Remaining: Phase 5 go-live** (live PayPal creds + flip URLs) and Phase 6
-> (refunds + switch receipts back to the GI API). _Last updated: 2026-06-03._
+> **Status: 🟢 LIVE on prod (2026-06-03, commit `717aa50`).** `PAYMENT_PROVIDER=paypal`
+> with live PayPal creds; live OAuth + all public endpoints verified 200. Receipts are
+> **MANUAL** at launch — Green Invoice's API needs a paid plan, so GI creds stay empty
+> and the קבלה is issued by hand (see "Manual receipt mode"). Sandbox e2e proved the
+> full auto path earlier (card-first checkout → PayPal approve → server capture →
+> idempotent PAID → GI קבלה #80003 → `invoice_number` mirror + retry sweep + SPA
+> receipt link). **Remaining: Idan's first real ₪-small acceptance charge**; later
+> Phase 6 (refunds + switch receipts back to the GI API). _Last updated: 2026-06-03._
 >
 > **Bugs found + fixed during the sandbox e2e (all in this uncommitted change):**
 > 1. V20 `currency CHAR(3)` → `VARCHAR(3)` — Hibernate `ddl-auto: validate`
@@ -54,9 +53,10 @@ into Halilov Online. Permanent architecture lives in [ARCHITECTURE.md](ARCHITECT
 1. ~~**PayPal sandbox** — Client ID + Secret.~~ ✅ done; in `infra/.env`.
 2. ~~**Green Invoice sandbox** — key id + secret.~~ ✅ done; in `infra/.env`
    (base `https://sandbox.d.greeninvoice.co.il/api/v1`).
-3. **PayPal live** (for go-live, Phase 5) — verified **PayPal Business** account;
-   create a live app → live Client ID + Secret; register a webhook on
-   `https://halilov.co.il/api/payments/paypal/webhook` → note the **Webhook ID**.
+3. ~~**PayPal live** — live Client ID + Secret + Webhook ID.~~ ✅ done; webhook
+   `1WG01995RL960522P` registered on `https://halilov.co.il/api/payments/paypal/webhook`
+   (events: Checkout order approved + Payment capture completed + refunded). Live creds
+   are in prod `infra/.env` (provided in chat, never committed).
 4. ~~**Green Invoice live** — prod key id + secret.~~ **Deferred — manual receipts at
    launch** (the GI API needs a paid plan). Account stays **עוסק פטור 325350643 /
    עידן חלילוב**; receipts are issued by hand until volume justifies the API plan
@@ -120,7 +120,9 @@ on `gi_status IN ('PENDING','FAILED')`.
 - [x] **4b. Legal wording** — `InvoicePage` title → `סיכום הזמנה`, fine print says
   "not a tax document", and a **הקבלה הרשמית** button links the GI doc via new
   `GET /api/payments/{n}/receipt`.
-- [ ] **5. Go-live (manual receipts)**
+- [x] **5. Go-live (manual receipts)** — DONE 2026-06-03 (`717aa50` live on prod;
+  provider=paypal, manual receipts, GI empty). Only Idan's first real ₪-small
+  acceptance charge remains. Runbook used:
   - Prod `.env`: set live **PayPal** creds + `PAYPAL_WEBHOOK_ID`,
     `PAYPAL_BASE_URL=https://api-m.paypal.com`,
     `PAYMENT_RETURN_BASE_URL=https://halilov.co.il`, `RECEIPT_MANUAL_NOTICE=true`,
@@ -222,12 +224,23 @@ compliant version — this is a deliberate, reversible cost trade.
 > public HTTPS host. Server→gateway calls (OAuth, createOrder, GI token+document)
 > were already validated against sandbox via curl.
 
-## How to resume / go-live (Phase 5)
+## Post-go-live operations
 
-Read this file + the memory note `project_payment_invoice_build.md`. For go-live:
-get the live PayPal Business creds + webhook id and live GI key (see "What Idan
-needs to do"), then in prod `.env` set the creds, `PAYPAL_BASE_URL=https://api-m.paypal.com`,
-`GREEN_INVOICE_BASE_URL=https://api.greeninvoice.co.il/api/v1`,
-`PAYMENT_RETURN_BASE_URL` (or `SITE_BASE_URL`) = `https://halilov.co.il`, flip
-`PAYMENT_PROVIDER=paypal`, redeploy. Do one ₪-small real end-to-end charge, confirm
-the קבלה issued, then open. Keep ARCHITECTURE.md §3.2 + `backend/README.md` in sync.
+Go-live is **done** (🟢 LIVE 2026-06-03, `717aa50`) — see Status + Phase 5 above for the
+exact runbook used. Day-to-day + future tasks:
+
+- **Acceptance test (open item):** one real ₪-small charge on `https://halilov.co.il`
+  → expect PAID + the "within a business day" email; the order shows "ממתין לקבלה",
+  then issue the קבלה by hand and **סמן נשלחה** on it. Undo a test charge from the
+  PayPal dashboard (auto-refund is Phase 6).
+- **Kill switch:** set `PAYMENT_PROVIDER=disabled` in prod `infra/.env` +
+  `docker compose -f infra/docker-compose.prod.yml --env-file infra/.env up -d`
+  (~1-2min, no rebuild) → payments hard-stop immediately. `.env` backups:
+  `infra/.env.bak-golive-*`.
+- **Switch receipts to the automated GI API (later):** see "Manual receipt mode →
+  Switching back" — **first** mark all hand-issued paid orders ISSUED (avoids duplicate
+  קבלות), then fill the GI creds + `RECEIPT_MANUAL_NOTICE=false` + redeploy.
+- **Post-go-live hygiene:** rotate the PayPal Secret (generate key 2, retire key 1) —
+  the launch secret traveled over chat/free wifi.
+
+Keep ARCHITECTURE.md §3.2 + `backend/README.md` in sync with any change here.
