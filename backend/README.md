@@ -57,7 +57,7 @@ and why. Quick map:
 | `catalog`      | Products, categories, sitemap, public + admin catalog APIs.          |
 | `cart`         | Server-backed cart lines for authenticated users.                    |
 | `favorites`    | Server-backed wishlist (per-user set of product ids) for authenticated users. |
-| `coupon`       | Discount codes (PERCENT / FIXED) and usage tracking.                 |
+| `coupon`       | Composable discount codes (% + ₪ + free-shipping mix, cap, once-per-customer, scheduling) and usage tracking. |
 | `order`        | Order lifecycle, addresses, refunds, CSV export, delivery pricing.   |
 | `payment`      | PayPal Orders-v2 charge + capture, Green Invoice קבלה, `payments` table. |
 | `notification` | Email outbox + builders (transactional). Brevo or stdout transport.  |

@@ -259,13 +259,14 @@ export type DeliveryConfig = {
   freeAboveAgorot: number
 }
 
-export type CouponType = 'PERCENT' | 'FIXED'
-
 export type CouponValidateResponse = {
   code: string
-  type: CouponType
-  value: number
+  /** Combined subtotal discount (percent + fixed, capped). */
   discountAgorot: number
+  /** Whether the coupon also waives the delivery fee. */
+  freeShipping: boolean
+  /** Hebrew summary for the applied-coupon chip, e.g. "20% הנחה + משלוח חינם". */
+  summary: string
 }
 
 export type OrderItemView = {

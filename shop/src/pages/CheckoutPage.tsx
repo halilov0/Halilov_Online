@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, Fragment } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import {
   api, ApiError, formatPrice, rememberGuestOrder,
-  type CouponValidateResponse, type CreateOrderRequest,
+  type CreateOrderRequest,
   type DeliveryQuote, type OrderView, type SavedAddress,
 } from '../api'
 import { useCart } from '../cart/cartStore'
@@ -44,7 +44,10 @@ function splitPhone(raw: string): { prefix: string; number: string } {
 }
 
 export function CheckoutPage() {
-  const { lines, subtotalAgorot, clearAll } = useCart()
+  const {
+    lines, subtotalAgorot, clearAll,
+    coupon, couponCode, couponError, applyCoupon, removeCoupon, revalidateCoupon,
+  } = useCart()
   const { user } = useAuth()
   const courierFlatAgorot = useDeliveryConfig(s => s.courierFlatAgorot)
   const freeAboveAgorot = useDeliveryConfig(s => s.freeAboveAgorot)
@@ -65,9 +68,9 @@ export function CheckoutPage() {
   const [error, setError] = useState<string | null>(null)
   const [errors, setErrors] = useState<Errors>({})
   const [touched, setTouched] = useState<Partial<Record<ErrorKey, boolean>>>({})
+  // Coupon lives in the cart store (applied in /cart, carried here). Only the
+  // input box and its in-flight flag are local to this page.
   const [couponInput, setCouponInput] = useState('')
-  const [coupon, setCoupon] = useState<CouponValidateResponse | null>(null)
-  const [couponError, setCouponError] = useState<string | null>(null)
   const [applyingCoupon, setApplyingCoupon] = useState(false)
 
   // Loaded lookup sets for validation. Empty = not yet loaded (don't block submit on those).
@@ -139,11 +142,13 @@ export function CheckoutPage() {
   const subtotal = subtotalAgorot()
   const discount = coupon ? Math.min(coupon.discountAgorot, subtotal) : 0
   const discountedSubtotal = Math.max(0, subtotal - discount)
+  const freeShipping = coupon?.freeShipping ?? false
   const shippingAgorot = useMemo(() => {
+    if (freeShipping) return 0
     const opt = deliveryQuote?.options.find(o => o.method === 'COURIER')
     if (opt) return opt.priceAgorot
     return discountedSubtotal >= freeAboveAgorot ? 0 : courierFlatAgorot
-  }, [deliveryQuote, discountedSubtotal, freeAboveAgorot, courierFlatAgorot])
+  }, [deliveryQuote, discountedSubtotal, freeAboveAgorot, courierFlatAgorot, freeShipping])
   const total = discountedSubtotal + shippingAgorot
 
   useEffect(() => {
@@ -154,40 +159,24 @@ export function CheckoutPage() {
     return () => { cancelled = true }
   }, [discountedSubtotal])
 
+  // Re-validate the carried coupon against the live subtotal — it may now fail
+  // the minimum, or a previously-failing code may apply once the cart grows.
   useEffect(() => {
-    if (!coupon) return
-    if (subtotal === 0) { setCoupon(null); return }
-    api<CouponValidateResponse>('/api/coupons/validate', {
-      method: 'POST',
-      body: JSON.stringify({ code: coupon.code, subtotalAgorot: subtotal }),
-    }).then(setCoupon).catch(e => {
-      setCoupon(null)
-      setCouponError(e instanceof Error ? e.message : 'הקוד אינו תקף יותר')
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subtotal])
+    if (couponCode) void revalidateCoupon()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subtotal, couponCode])
 
-  async function applyCoupon() {
+  async function onApplyCoupon() {
     const code = couponInput.trim()
     if (!code) return
-    setApplyingCoupon(true); setCouponError(null)
-    try {
-      const res = await api<CouponValidateResponse>('/api/coupons/validate', {
-        method: 'POST',
-        body: JSON.stringify({ code, subtotalAgorot: subtotal }),
-      })
-      setCoupon(res)
-      setCouponInput('')
-    } catch (e) {
-      setCoupon(null)
-      setCouponError(e instanceof Error ? e.message : 'קוד לא תקין')
-    } finally {
-      setApplyingCoupon(false)
-    }
+    setApplyingCoupon(true)
+    const ok = await applyCoupon(code)
+    setApplyingCoupon(false)
+    if (ok) setCouponInput('')
   }
 
-  function removeCoupon() {
-    setCoupon(null); setCouponError(null); setCouponInput('')
+  function onRemoveCoupon() {
+    removeCoupon(); setCouponInput('')
   }
 
   function validate(name: ErrorKey, value: string): string | null {
@@ -371,11 +360,11 @@ export function CheckoutPage() {
                   <div>
                     שליח עד הבית — {' '}
                     <strong>
-                      {shippingForCourier(deliveryQuote, courierFlatAgorot) === 0
-                        ? 'חינם'
-                        : formatPrice(shippingForCourier(deliveryQuote, courierFlatAgorot))}
+                      {shippingAgorot === 0 ? 'חינם' : formatPrice(shippingAgorot)}
                     </strong>
-                    {freeThresholdHint(deliveryQuote, discountedSubtotal)}
+                    {freeShipping
+                      ? ' · הקופון כולל משלוח חינם'
+                      : freeThresholdHint(deliveryQuote, discountedSubtotal)}
                   </div>
                 </div>
               )}
@@ -541,10 +530,8 @@ export function CheckoutPage() {
                 {coupon ? (
                   <div className="applied">
                     <span className="tag">{coupon.code}</span>
-                    <span className="meta">
-                      {coupon.type === 'PERCENT' ? `${coupon.value}% הנחה` : 'הנחה'}
-                    </span>
-                    <button type="button" className="rm" onClick={removeCoupon} aria-label="הסר קוד">
+                    <span className="meta">{coupon.summary || 'הנחה'}</span>
+                    <button type="button" className="rm" onClick={onRemoveCoupon} aria-label="הסר קוד">
                       <Icon name="x" size={12} />
                     </button>
                   </div>
@@ -554,10 +541,10 @@ export function CheckoutPage() {
                       type="text"
                       placeholder="הזן קוד"
                       value={couponInput}
-                      onChange={e => { setCouponInput(e.target.value); setCouponError(null) }}
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); applyCoupon() } }}
+                      onChange={e => setCouponInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void onApplyCoupon() } }}
                     />
-                    <button type="button" onClick={applyCoupon}
+                    <button type="button" onClick={onApplyCoupon}
                             disabled={applyingCoupon || !couponInput.trim()}>
                       {applyingCoupon ? '…' : 'החל'}
                     </button>
@@ -600,11 +587,6 @@ export function CheckoutPage() {
       <Footer />
     </>
   )
-}
-
-function shippingForCourier(q: DeliveryQuote | null, fallbackAgorot: number): number {
-  const opt = q?.options.find(o => o.method === 'COURIER')
-  return opt ? opt.priceAgorot : fallbackAgorot
 }
 
 function freeThresholdHint(q: DeliveryQuote | null, subtotalAgorot: number): string {

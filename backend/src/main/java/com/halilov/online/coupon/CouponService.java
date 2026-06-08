@@ -14,12 +14,14 @@ import java.util.Optional;
  *
  * <p>{@link #resolveForOrder} is the single hot-path entry point used
  * by the checkout — it normalises the code, checks the active window
- * and the minimum subtotal, computes the discount in agorot, and
- * returns an immutable {@code AppliedCoupon} snapshot. The
- * complementary {@link #incrementUsage} / {@link #decrementUsage} move
- * the usage counter on {@code PENDING → PAID} and on cancel/refund
- * respectively — kept in lockstep with the order state by
- * {@link com.halilov.online.order.OrderService}.
+ * (scheduled start + expiry), max-uses, and the minimum subtotal,
+ * computes the combined discount in agorot, and returns an immutable
+ * {@code AppliedCoupon} snapshot (subtotal discount + free-shipping +
+ * once-per-customer flags). The complementary {@link #incrementUsage} /
+ * {@link #decrementUsage} move the usage counter on {@code PENDING → PAID}
+ * and on cancel/refund respectively — kept in lockstep with the order
+ * state by {@link com.halilov.online.order.OrderService}, which also
+ * enforces the once-per-customer rule (it owns the buyer identity).
  */
 @Service
 public class CouponService {
@@ -42,7 +44,7 @@ public class CouponService {
         if (coupons.existsByCodeIgnoreCase(code)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "קוד כבר קיים");
         }
-        validateTypeValue(req.type(), req.value());
+        validateBenefits(req);
         Coupon c = new Coupon();
         apply(c, req, code);
         return CouponDtos.CouponView.from(coupons.save(c));
@@ -56,7 +58,7 @@ public class CouponService {
         if (!c.getCode().equalsIgnoreCase(code) && coupons.existsByCodeIgnoreCase(code)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "קוד כבר קיים");
         }
-        validateTypeValue(req.type(), req.value());
+        validateBenefits(req);
         apply(c, req, code);
         return CouponDtos.CouponView.from(c);
     }
@@ -71,8 +73,6 @@ public class CouponService {
 
     /** Bulk delete. Unknown ids are skipped; returns the number actually
      *  removed so the controller can audit the real count. */
-    /** Bulk delete. Unknown ids are skipped; returns the number actually
-     *  removed so the controller can audit the real count. */
     @Transactional
     public int adminDeleteMany(List<Long> ids) {
         List<Coupon> found = coupons.findAllById(ids);
@@ -83,8 +83,13 @@ public class CouponService {
     @Transactional(readOnly = true)
     public CouponDtos.ValidateResponse validate(CouponDtos.ValidateRequest req) {
         Coupon c = requireUsable(req.code(), req.subtotalAgorot());
-        int discount = computeDiscount(c, req.subtotalAgorot());
-        return new CouponDtos.ValidateResponse(c.getCode(), c.getType(), c.getValue(), discount);
+        // Note: oncePerCustomer is NOT checked here — the /validate preview is
+        // anonymous and has no buyer identity. It's enforced authoritatively at
+        // order creation (OrderService), so a second redemption fails at submit.
+        return new CouponDtos.ValidateResponse(
+            c.getCode(), computeDiscount(c, req.subtotalAgorot()), c.isFreeShipping(),
+            CouponDtos.summarize(c.getPercentOff(), c.getFixedOffAgorot(),
+                                 c.isFreeShipping(), c.getMaxDiscountAgorot()));
     }
 
     /** Used by OrderService when creating an order with a coupon code. */
@@ -92,7 +97,9 @@ public class CouponService {
     public Optional<AppliedCoupon> resolveForOrder(String rawCode, int subtotalAgorot) {
         if (rawCode == null || rawCode.isBlank()) return Optional.empty();
         Coupon c = requireUsable(rawCode, subtotalAgorot);
-        return Optional.of(new AppliedCoupon(c.getCode(), computeDiscount(c, subtotalAgorot)));
+        return Optional.of(new AppliedCoupon(
+            c.getCode(), computeDiscount(c, subtotalAgorot),
+            c.isFreeShipping(), c.isOncePerCustomer()));
     }
 
     /** Best-effort usage increment after order is paid. Won't fail the parent tx. */
@@ -114,10 +121,14 @@ public class CouponService {
     private Coupon requireUsable(String rawCode, int subtotalAgorot) {
         Coupon c = coupons.findByCodeIgnoreCase(normalize(rawCode))
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "קוד לא תקין"));
+        Instant now = Instant.now();
         if (!c.isActive()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "הקוד אינו פעיל");
         }
-        if (c.getExpiresAt() != null && c.getExpiresAt().isBefore(Instant.now())) {
+        if (c.getActiveFrom() != null && c.getActiveFrom().isAfter(now)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "הקוד עדיין לא פעיל");
+        }
+        if (c.getExpiresAt() != null && c.getExpiresAt().isBefore(now)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "הקוד פג תוקף");
         }
         if (c.getMaxUses() != null && c.getUsedCount() >= c.getMaxUses()) {
@@ -130,33 +141,60 @@ public class CouponService {
         return c;
     }
 
+    /**
+     * Combined subtotal discount in agorot: percent + fixed, capped by
+     * {@code maxDiscountAgorot} (if set) and never exceeding the subtotal.
+     * Free shipping is a separate benefit and not reflected here.
+     */
     private int computeDiscount(Coupon c, int subtotalAgorot) {
-        int raw = switch (c.getType()) {
-            case PERCENT -> Math.round(subtotalAgorot * (c.getValue() / 100f));
-            case FIXED   -> c.getValue();
-        };
-        return Math.max(0, Math.min(raw, subtotalAgorot));
+        long raw = 0;
+        if (c.getPercentOff() != null) {
+            raw += Math.round(subtotalAgorot * (c.getPercentOff() / 100f));
+        }
+        if (c.getFixedOffAgorot() != null) {
+            raw += c.getFixedOffAgorot();
+        }
+        if (c.getMaxDiscountAgorot() != null) {
+            raw = Math.min(raw, c.getMaxDiscountAgorot());
+        }
+        return (int) Math.max(0, Math.min(raw, subtotalAgorot));
     }
 
     private static String normalize(String code) {
         return code == null ? null : code.trim().toUpperCase();
     }
 
-    private static void validateTypeValue(CouponType type, int value) {
-        if (type == CouponType.PERCENT && (value < 1 || value > 100)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "אחוז 1-100 בלבד");
+    /** A coupon must grant at least one benefit. (Ranges are bean-validated.) */
+    private static void validateBenefits(CouponDtos.CouponUpsert req) {
+        boolean hasBenefit = req.percentOff() != null
+            || req.fixedOffAgorot() != null
+            || req.freeShipping();
+        if (!hasBenefit) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "יש לבחור לפחות הטבה אחת (אחוז / סכום / משלוח חינם)");
         }
     }
 
     private static void apply(Coupon c, CouponDtos.CouponUpsert req, String normalizedCode) {
         c.setCode(normalizedCode);
-        c.setType(req.type());
-        c.setValue(req.value());
+        c.setPercentOff(req.percentOff());
+        c.setFixedOffAgorot(req.fixedOffAgorot());
+        c.setFreeShipping(req.freeShipping());
+        c.setMaxDiscountAgorot(req.maxDiscountAgorot());
         c.setMinSubtotalAgorot(req.minSubtotalAgorot());
         c.setMaxUses(req.maxUses());
+        c.setOncePerCustomer(req.oncePerCustomer());
+        c.setActiveFrom(req.activeFrom());
         c.setExpiresAt(req.expiresAt());
         c.setActive(req.active());
     }
 
-    public record AppliedCoupon(String code, int discountAgorot) {}
+    /**
+     * Immutable snapshot of an applied coupon: the resolved code, the
+     * combined subtotal discount, whether shipping is waived, and whether
+     * the code is once-per-customer (enforced by the caller, which owns the
+     * buyer identity).
+     */
+    public record AppliedCoupon(String code, int discountAgorot,
+                                boolean freeShipping, boolean oncePerCustomer) {}
 }

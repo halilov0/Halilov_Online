@@ -7,13 +7,20 @@ import java.time.Instant;
 /**
  * The {@code coupons} table.
  *
- * <p>{@code value} is interpreted by {@link CouponType}: whole
- * percent for {@code PERCENT}, integer agorot for {@code FIXED}.
- * Optional {@code min_subtotal_agorot}, {@code max_uses}, and
- * {@code active_from}/{@code active_until} gate eligibility.
- * {@code usage_count} is mutated by
- * {@link com.halilov.online.order.OrderService} in lockstep with
- * order state transitions, never by the admin UI.
+ * <p>A coupon carries any mix of independent benefits, all optional but
+ * at least one required (enforced by {@code coupons_has_benefit_chk}):
+ * <ul>
+ *   <li>{@code percentOff} — whole percent off the subtotal (1-100)</li>
+ *   <li>{@code fixedOffAgorot} — flat agorot off the subtotal</li>
+ *   <li>{@code freeShipping} — waives the delivery fee</li>
+ * </ul>
+ * {@code maxDiscountAgorot} caps the combined subtotal discount (handy to
+ * bound a percent coupon on a big cart). Eligibility gates:
+ * {@code minSubtotalAgorot}, {@code maxUses} (global), {@code oncePerCustomer}
+ * (enforced at order creation by {@link com.halilov.online.order.OrderService}),
+ * and the {@code activeFrom}/{@code expiresAt} window. {@code usedCount} is
+ * mutated by {@code OrderService} in lockstep with order state, never by the
+ * admin UI.
  */
 @Entity
 @Table(name = "coupons")
@@ -26,12 +33,21 @@ public class Coupon {
     @Column(nullable = false, unique = true)
     private String code;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private CouponType type;
+    /** Whole percent (1-100) off the subtotal, or null. */
+    @Column(name = "percent_off")
+    private Integer percentOff;
 
-    @Column(nullable = false)
-    private int value;
+    /** Flat agorot off the subtotal, or null. */
+    @Column(name = "fixed_off_agorot")
+    private Integer fixedOffAgorot;
+
+    /** Waives the delivery fee. */
+    @Column(name = "free_shipping", nullable = false)
+    private boolean freeShipping = false;
+
+    /** Caps the combined subtotal discount (agorot), or null for no cap. */
+    @Column(name = "max_discount_agorot")
+    private Integer maxDiscountAgorot;
 
     @Column(name = "min_subtotal_agorot", nullable = false)
     private int minSubtotalAgorot = 0;
@@ -39,8 +55,16 @@ public class Coupon {
     @Column(name = "max_uses")
     private Integer maxUses;
 
+    /** Each customer may redeem the code once (by account or guest email). */
+    @Column(name = "once_per_customer", nullable = false)
+    private boolean oncePerCustomer = false;
+
     @Column(name = "used_count", nullable = false)
     private int usedCount = 0;
+
+    /** Scheduled start — the code is inert before this instant, or null. */
+    @Column(name = "active_from")
+    private Instant activeFrom;
 
     @Column(name = "expires_at")
     private Instant expiresAt;
@@ -54,16 +78,24 @@ public class Coupon {
     public Long getId() { return id; }
     public String getCode() { return code; }
     public void setCode(String code) { this.code = code; }
-    public CouponType getType() { return type; }
-    public void setType(CouponType type) { this.type = type; }
-    public int getValue() { return value; }
-    public void setValue(int value) { this.value = value; }
+    public Integer getPercentOff() { return percentOff; }
+    public void setPercentOff(Integer percentOff) { this.percentOff = percentOff; }
+    public Integer getFixedOffAgorot() { return fixedOffAgorot; }
+    public void setFixedOffAgorot(Integer fixedOffAgorot) { this.fixedOffAgorot = fixedOffAgorot; }
+    public boolean isFreeShipping() { return freeShipping; }
+    public void setFreeShipping(boolean freeShipping) { this.freeShipping = freeShipping; }
+    public Integer getMaxDiscountAgorot() { return maxDiscountAgorot; }
+    public void setMaxDiscountAgorot(Integer maxDiscountAgorot) { this.maxDiscountAgorot = maxDiscountAgorot; }
     public int getMinSubtotalAgorot() { return minSubtotalAgorot; }
     public void setMinSubtotalAgorot(int minSubtotalAgorot) { this.minSubtotalAgorot = minSubtotalAgorot; }
     public Integer getMaxUses() { return maxUses; }
     public void setMaxUses(Integer maxUses) { this.maxUses = maxUses; }
+    public boolean isOncePerCustomer() { return oncePerCustomer; }
+    public void setOncePerCustomer(boolean oncePerCustomer) { this.oncePerCustomer = oncePerCustomer; }
     public int getUsedCount() { return usedCount; }
     public void setUsedCount(int usedCount) { this.usedCount = usedCount; }
+    public Instant getActiveFrom() { return activeFrom; }
+    public void setActiveFrom(Instant activeFrom) { this.activeFrom = activeFrom; }
     public Instant getExpiresAt() { return expiresAt; }
     public void setExpiresAt(Instant expiresAt) { this.expiresAt = expiresAt; }
     public boolean isActive() { return active; }

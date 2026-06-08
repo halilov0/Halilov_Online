@@ -174,9 +174,26 @@ public class OrderService {
         }
 
         var applied = couponService.resolveForOrder(req.couponCode(), subtotal).orElse(null);
+        // Once-per-customer is enforced here (not in CouponService) because this
+        // is where the buyer identity lives. Match by account for signed-in
+        // users, by contact email for guests; a cancelled prior order doesn't
+        // count (its usage was reversed).
+        if (applied != null && applied.oncePerCustomer()) {
+            boolean redeemed = user != null
+                ? orders.existsByUserIdAndCouponCodeIgnoreCaseAndStatusNot(
+                    user.getId(), applied.code(), OrderStatus.CANCELLED)
+                : orders.existsByGuestEmailIgnoreCaseAndCouponCodeIgnoreCaseAndStatusNot(
+                    guestEmail, applied.code(), OrderStatus.CANCELLED);
+            if (redeemed) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "כבר נוצל קוד זה");
+            }
+        }
         int discount = applied != null ? applied.discountAgorot() : 0;
         int discountedSubtotal = Math.max(0, subtotal - discount);
         int shippingAgorot = deliveryService.priceFor(method, discountedSubtotal);
+        // Free-shipping coupons waive the delivery fee outright.
+        if (applied != null && applied.freeShipping()) shippingAgorot = 0;
         int gross = discountedSubtotal + shippingAgorot;
         order.setSubtotalAgorot(subtotal);
         order.setDiscountAgorot(discount);

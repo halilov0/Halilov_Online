@@ -1,21 +1,47 @@
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../cart/cartStore'
 import { formatPrice } from '../api'
 import { useDeliveryConfig } from '../delivery/deliveryConfig'
 import { Icon } from '../components/Icon'
 import { Footer } from '../components/Footer'
-import { comingSoon } from '../components/Toast'
 
 export function CartPage() {
-  const { lines, setQty, remove, subtotalAgorot, adjustments, dismissAdjustment } = useCart()
+  const {
+    lines, setQty, remove, subtotalAgorot, adjustments, dismissAdjustment,
+    coupon, couponCode, couponError, applyCoupon, removeCoupon, revalidateCoupon,
+  } = useCart()
   const courierFlatAgorot = useDeliveryConfig(s => s.courierFlatAgorot)
   const freeAboveAgorot = useDeliveryConfig(s => s.freeAboveAgorot)
   const nav = useNavigate()
+
+  const [couponInput, setCouponInput] = useState('')
+  const [applying, setApplying] = useState(false)
+
   const subtotal = subtotalAgorot()
-  const shipping = subtotal >= freeAboveAgorot ? 0 : courierFlatAgorot
-  const total = subtotal + shipping
-  const toFree = Math.max(0, freeAboveAgorot - subtotal)
+  const discount = coupon ? Math.min(coupon.discountAgorot, subtotal) : 0
+  const discountedSubtotal = Math.max(0, subtotal - discount)
+  const freeShipping = coupon?.freeShipping ?? false
+  const shipping = freeShipping || discountedSubtotal >= freeAboveAgorot ? 0 : courierFlatAgorot
+  const total = discountedSubtotal + shipping
+  const toFree = freeShipping ? 0 : Math.max(0, freeAboveAgorot - discountedSubtotal)
   const totalItems = lines.reduce((s, l) => s + l.quantity, 0)
+
+  // Re-validate a persisted coupon against the live subtotal whenever it
+  // changes (qty +/-, line removed) — it may now clear or fail the minimum.
+  useEffect(() => {
+    if (couponCode) void revalidateCoupon()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subtotal, couponCode])
+
+  async function onApply() {
+    const code = couponInput.trim()
+    if (!code) return
+    setApplying(true)
+    const ok = await applyCoupon(code)
+    setApplying(false)
+    if (ok) setCouponInput('')
+  }
 
   // Inline notices for changes the server made (so the cart never mutates
   // silently): removed lines surface as a banner, clamps as a per-line note.
@@ -38,6 +64,37 @@ export function CartPage() {
           </button>
         </div>
       ))}
+    </div>
+  )
+
+  // The applied-coupon chip / code-entry box, shared between empty-cart guard
+  // and the normal summary.
+  const couponBox = (
+    <div className="coupon-row">
+      <div className="lbl">קוד הטבה</div>
+      {coupon ? (
+        <div className="applied">
+          <span className="tag">{coupon.code}</span>
+          <span className="meta">{coupon.summary || 'הנחה'}</span>
+          <button type="button" className="rm" onClick={removeCoupon} aria-label="הסר קוד">
+            <Icon name="x" size={12} />
+          </button>
+        </div>
+      ) : (
+        <div className="inputs">
+          <input
+            type="text"
+            placeholder="הזן קוד"
+            value={couponInput}
+            onChange={e => setCouponInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void onApply() } }}
+          />
+          <button onClick={onApply} disabled={applying || !couponInput.trim()}>
+            {applying ? '…' : 'החל'}
+          </button>
+        </div>
+      )}
+      {couponError && <div className="err">{couponError}</div>}
     </div>
   )
 
@@ -158,6 +215,12 @@ export function CartPage() {
               <span>סך ביניים</span>
               <span className="v">{formatPrice(subtotal)}</span>
             </div>
+            {discount > 0 && (
+              <div className="row" style={{ color: 'var(--olive, #5d7a3a)' }}>
+                <span>הנחה ({coupon!.code})</span>
+                <span className="v">-{formatPrice(discount)}</span>
+              </div>
+            )}
             <div className="row">
               <span>משלוח</span>
               <span className="v">{shipping === 0 ? 'חינם' : formatPrice(shipping)}</span>
@@ -173,15 +236,9 @@ export function CartPage() {
             </button>
             <div className="secure-note">
               <Icon name="secure" size={16} />
-              תשלום מאובטח · Grow / Meshulam
+              תשלום מאובטח · PayPal
             </div>
-            <div className="coupon-row">
-              <div className="lbl">קוד הטבה</div>
-              <div className="inputs">
-                <input placeholder="HALILOV20" />
-                <button onClick={() => comingSoon('קופונים')}>החל</button>
-              </div>
-            </div>
+            {couponBox}
           </aside>
         </div>
       </div>

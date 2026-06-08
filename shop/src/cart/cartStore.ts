@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import {
   api, ApiError, getToken,
   type CartAdjustment, type CartLineView, type CartReplaceRequest,
-  type CartResponse, type CartUpsertItem, type Product,
+  type CartResponse, type CartUpsertItem, type CouponValidateResponse, type Product,
 } from '../api'
 import { useToast } from '../components/Toast'
 
@@ -33,6 +33,10 @@ import { useToast } from '../components/Toast'
  */
 
 const STORAGE_KEY = 'halilov.cart'
+// The applied coupon code, persisted so it survives the cart → checkout
+// navigation (and a refresh). Only the code is stored; the validated discount
+// is re-fetched against the live subtotal, never trusted from localStorage.
+const COUPON_KEY = 'halilov.cart.coupon'
 // Records which signed-in user the persisted cart belongs to. Lets login
 // reconciliation tell a genuine guest cart (fold into the account) apart from
 // the residue of an expired session — whose cart already lives on the server,
@@ -93,6 +97,24 @@ type CartState = {
   pushToRemote: () => Promise<void>
   totalItems: () => number
   subtotalAgorot: () => number
+
+  // ---- coupon ----
+  /** The applied coupon code (persisted), or null. */
+  couponCode: string | null
+  /** Last successful validation against the live subtotal, or null when the
+   *  code currently doesn't apply (e.g. min-subtotal not met). */
+  coupon: CouponValidateResponse | null
+  /** Why the last apply/revalidate failed, for inline display. */
+  couponError: string | null
+  /** Validate `code` against the current subtotal and apply it. Returns whether
+   *  it stuck. */
+  applyCoupon: (code: string) => Promise<boolean>
+  /** Drop the applied coupon entirely. */
+  removeCoupon: () => void
+  /** Re-validate the persisted code against the live subtotal. Keeps the code
+   *  but clears the active discount when it no longer applies, so it re-applies
+   *  if the cart grows. No-op when no code is set. */
+  revalidateCoupon: () => Promise<void>
 }
 
 function load(): CartLine[] {
@@ -116,6 +138,23 @@ function load(): CartLine[] {
 
 function save(lines: CartLine[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(lines))
+}
+
+function loadCouponCode(): string | null {
+  return localStorage.getItem(COUPON_KEY)
+}
+
+function saveCouponCode(code: string | null) {
+  if (code) localStorage.setItem(COUPON_KEY, code)
+  else localStorage.removeItem(COUPON_KEY)
+}
+
+/** POST /api/coupons/validate for `code` at `subtotalAgorot`. */
+function validateCoupon(code: string, subtotalAgorot: number): Promise<CouponValidateResponse> {
+  return api<CouponValidateResponse>('/api/coupons/validate', {
+    method: 'POST',
+    body: JSON.stringify({ code, subtotalAgorot }),
+  })
 }
 
 /** userId the persisted cart is synced with, or null for a guest cart. */
@@ -314,6 +353,9 @@ function adoptServerResult(res: CartResponse) {
 export const useCart = create<CartState>((set, get) => ({
   lines: load(),
   adjustments: [],
+  couponCode: loadCouponCode(),
+  coupon: null,
+  couponError: null,
 
   add(p, quantity = 1) {
     const lines = [...get().lines]
@@ -362,13 +404,15 @@ export const useCart = create<CartState>((set, get) => ({
 
   clearLocal() {
     save([])
-    set({ lines: [], adjustments: [] })
+    saveCouponCode(null)
+    set({ lines: [], adjustments: [], couponCode: null, coupon: null, couponError: null })
     broadcastUpdate([])
   },
 
   async clearAll() {
     save([])
-    set({ lines: [], adjustments: [] })
+    saveCouponCode(null)
+    set({ lines: [], adjustments: [], couponCode: null, coupon: null, couponError: null })
     broadcastUpdate([])
     cancelPendingPush()
     if (!getToken()) return
@@ -462,6 +506,39 @@ export const useCart = create<CartState>((set, get) => ({
 
   subtotalAgorot() {
     return get().lines.reduce((sum, l) => sum + l.priceAgorot * l.quantity, 0)
+  },
+
+  async applyCoupon(code) {
+    const c = code.trim()
+    if (!c) return false
+    try {
+      const res = await validateCoupon(c, get().subtotalAgorot())
+      saveCouponCode(res.code)
+      set({ couponCode: res.code, coupon: res, couponError: null })
+      return true
+    } catch (e) {
+      set({ couponError: e instanceof Error ? e.message : 'קוד לא תקין' })
+      return false
+    }
+  },
+
+  removeCoupon() {
+    saveCouponCode(null)
+    set({ couponCode: null, coupon: null, couponError: null })
+  },
+
+  async revalidateCoupon() {
+    const code = get().couponCode
+    if (!code) return
+    const subtotal = get().subtotalAgorot()
+    if (subtotal === 0) { set({ coupon: null }); return }
+    try {
+      set({ coupon: await validateCoupon(code, subtotal), couponError: null })
+    } catch (e) {
+      // The code no longer applies at this subtotal (or expired/exhausted).
+      // Keep the code so it re-applies if the cart grows, but drop the discount.
+      set({ coupon: null, couponError: e instanceof Error ? e.message : 'הקוד אינו תקף יותר' })
+    }
   },
 }))
 

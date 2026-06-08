@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { api, formatPrice, type BulkResult, type Coupon, type CouponType, type CouponUpsert } from '../api'
+import { api, formatPrice, type BulkResult, type Coupon, type CouponUpsert } from '../api'
 import { Field } from '../components/Field'
 import { Icon } from '../components/Icon'
 import { Checkbox } from '../components/Checkbox'
@@ -8,40 +8,63 @@ import { confirmDialog, confirmBulkDelete } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
 import { useRowSelection } from '../hooks/useRowSelection'
 
+// The form works in shekels for money fields (friendlier than agorot) and
+// converts to agorot only at the API boundary. Empty string = "not set".
 type DraftState = {
   code: string
-  type: CouponType
-  value: string
+  percentOff: string
+  fixedOffShekel: string
+  freeShipping: boolean
+  maxDiscountShekel: string
   minSubtotalShekel: string
   maxUses: string
+  oncePerCustomer: boolean
+  activeFrom: string
   expiresAt: string
   active: boolean
 }
 
 const emptyDraft: DraftState = {
-  code: '', type: 'PERCENT', value: '10',
-  minSubtotalShekel: '', maxUses: '', expiresAt: '', active: true,
+  code: '', percentOff: '10', fixedOffShekel: '', freeShipping: false,
+  maxDiscountShekel: '', minSubtotalShekel: '', maxUses: '',
+  oncePerCustomer: false, activeFrom: '', expiresAt: '', active: true,
+}
+
+function shekelFromAgorot(agorot: number | null): string {
+  return agorot != null ? String(agorot / 100) : ''
 }
 
 function draftFromCoupon(c: Coupon): DraftState {
   return {
     code: c.code,
-    type: c.type,
-    value: String(c.value),
+    percentOff: c.percentOff != null ? String(c.percentOff) : '',
+    fixedOffShekel: shekelFromAgorot(c.fixedOffAgorot),
+    freeShipping: c.freeShipping,
+    maxDiscountShekel: shekelFromAgorot(c.maxDiscountAgorot),
     minSubtotalShekel: c.minSubtotalAgorot > 0 ? String(c.minSubtotalAgorot / 100) : '',
     maxUses: c.maxUses != null ? String(c.maxUses) : '',
+    oncePerCustomer: c.oncePerCustomer,
+    activeFrom: c.activeFrom ? c.activeFrom.slice(0, 16) : '',
     expiresAt: c.expiresAt ? c.expiresAt.slice(0, 16) : '',
     active: c.active,
   }
 }
 
+function agorotOrNull(shekel: string): number | null {
+  return shekel.trim() ? Math.round(Number(shekel) * 100) : null
+}
+
 function buildUpsert(d: DraftState): CouponUpsert {
   return {
     code: d.code.trim().toUpperCase(),
-    type: d.type,
-    value: Number(d.value),
+    percentOff: d.percentOff.trim() ? Number(d.percentOff) : null,
+    fixedOffAgorot: agorotOrNull(d.fixedOffShekel),
+    freeShipping: d.freeShipping,
+    maxDiscountAgorot: agorotOrNull(d.maxDiscountShekel),
     minSubtotalAgorot: d.minSubtotalShekel ? Math.round(Number(d.minSubtotalShekel) * 100) : 0,
     maxUses: d.maxUses ? Number(d.maxUses) : null,
+    oncePerCustomer: d.oncePerCustomer,
+    activeFrom: d.activeFrom ? new Date(d.activeFrom).toISOString() : null,
     expiresAt: d.expiresAt ? new Date(d.expiresAt).toISOString() : null,
     active: d.active,
   }
@@ -65,6 +88,9 @@ export function CouponsPage() {
   }
   useEffect(load, [])
 
+  // Front-stop the "no benefit" case so the admin gets a hint before the POST.
+  const hasBenefit = draft.percentOff.trim() !== '' || draft.fixedOffShekel.trim() !== '' || draft.freeShipping
+
   function startCreate() {
     setEditing(null); setCreating(true); setDraft(emptyDraft); setError(null)
   }
@@ -75,6 +101,7 @@ export function CouponsPage() {
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
+    if (!hasBenefit) { setError('בחרו לפחות הטבה אחת: אחוז, סכום, או משלוח חינם'); return }
     setBusy(true); setError(null)
     try {
       const body = buildUpsert(draft)
@@ -137,12 +164,9 @@ export function CouponsPage() {
     }
   }
 
-  function valueLabel(c: Coupon) {
-    return c.type === 'PERCENT' ? `${c.value}%` : formatPrice(c.value)
-  }
-
   function statusOf(c: Coupon): { lbl: string; cls: string } {
     if (!c.active) return { lbl: 'מושבת', cls: 'hm-status-cancelled' }
+    if (c.activeFrom && new Date(c.activeFrom) > new Date()) return { lbl: 'מתוזמן', cls: 'hm-status-pending' }
     if (c.expiresAt && new Date(c.expiresAt) < new Date()) return { lbl: 'פג תוקף', cls: 'hm-status-cancelled' }
     if (c.maxUses != null && c.usedCount >= c.maxUses) return { lbl: 'מוצה', cls: 'hm-status-cancelled' }
     return { lbl: 'פעיל', cls: 'hm-status-paid' }
@@ -168,36 +192,60 @@ export function CouponsPage() {
             {editing ? `עריכת ${editing.code}` : 'קוד חדש'}
           </h3>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-            <Field label="קוד" required mono value={draft.code}
-                   onChange={e => setDraft({ ...draft, code: e.target.value })} />
-            <div className="hm-field">
-              <label>סוג הנחה</label>
-              <select className="hm-input" value={draft.type}
-                      onChange={e => setDraft({ ...draft, type: e.target.value as CouponType })}>
-                <option value="PERCENT">אחוז</option>
-                <option value="FIXED">סכום (₪)</option>
-              </select>
+          <Field label="קוד" required mono value={draft.code}
+                 onChange={e => setDraft({ ...draft, code: e.target.value })} />
+
+          {/* Benefits — any mix; at least one required. */}
+          <div style={{ border: '1px solid var(--line, #e3e0d8)', borderRadius: 10, padding: 14 }}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10, color: 'var(--ink-2)' }}>
+              הטבות (אפשר לשלב כמה — "סופר קופון")
             </div>
-            <Field
-              label={draft.type === 'PERCENT' ? 'אחוז (1-100)' : 'סכום באגורות'}
-              type="number" min={1} max={draft.type === 'PERCENT' ? 100 : undefined} required mono
-              value={draft.value}
-              onChange={e => setDraft({ ...draft, value: e.target.value })}
-            />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <Field label="אחוז הנחה (1-100, ריק = ללא)" type="number" min={1} max={100} mono
+                     value={draft.percentOff}
+                     onChange={e => setDraft({ ...draft, percentOff: e.target.value })} />
+              <Field label="סכום הנחה (₪, ריק = ללא)" type="number" min={0} mono
+                     value={draft.fixedOffShekel}
+                     onChange={e => setDraft({ ...draft, fixedOffShekel: e.target.value })} />
+              <Field label="תקרת הנחה (₪, אופציונלי)" type="number" min={0} mono
+                     value={draft.maxDiscountShekel}
+                     onChange={e => setDraft({ ...draft, maxDiscountShekel: e.target.value })} />
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+              <input type="checkbox" checked={draft.freeShipping}
+                     onChange={e => setDraft({ ...draft, freeShipping: e.target.checked })} />
+              <span>משלוח חינם</span>
+            </label>
+            {!hasBenefit && (
+              <div style={{ color: 'var(--danger, #b4232a)', fontSize: 12, marginTop: 6 }}>
+                בחרו לפחות הטבה אחת.
+              </div>
+            )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <Field label="מינימום הזמנה (₪, אופציונלי)" type="number" min={0} mono
                    value={draft.minSubtotalShekel}
                    onChange={e => setDraft({ ...draft, minSubtotalShekel: e.target.value })} />
             <Field label="מקסימום שימושים (ריק = ללא הגבלה)" type="number" min={1} mono
                    value={draft.maxUses}
                    onChange={e => setDraft({ ...draft, maxUses: e.target.value })} />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="פעיל מ- (אופציונלי)" type="datetime-local" mono
+                   value={draft.activeFrom}
+                   onChange={e => setDraft({ ...draft, activeFrom: e.target.value })} />
             <Field label="פג תוקף (אופציונלי)" type="datetime-local" mono
                    value={draft.expiresAt}
                    onChange={e => setDraft({ ...draft, expiresAt: e.target.value })} />
           </div>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" checked={draft.oncePerCustomer}
+                   onChange={e => setDraft({ ...draft, oncePerCustomer: e.target.checked })} />
+            <span>פעם אחת ללקוח</span>
+          </label>
 
           <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <input type="checkbox" checked={draft.active}
@@ -206,7 +254,7 @@ export function CouponsPage() {
           </label>
 
           <div style={{ display: 'flex', gap: 8 }}>
-            <button type="submit" className="hm-btn hm-btn-primary" disabled={busy}>
+            <button type="submit" className="hm-btn hm-btn-primary" disabled={busy || !hasBenefit}>
               {busy ? 'שומר…' : 'שמירה'}
             </button>
             <button type="button" className="hm-btn hm-btn-quiet" onClick={cancel}>ביטול</button>
@@ -222,7 +270,7 @@ export function CouponsPage() {
                         onClick={() => sel.toggleAll()} ariaLabel="בחר הכל" />
             </th>
             <th>קוד</th>
-            <th>הנחה</th>
+            <th>הטבה</th>
             <th>מינימום</th>
             <th>שימושים</th>
             <th>פג תוקף</th>
@@ -240,8 +288,16 @@ export function CouponsPage() {
                             onClick={(e) => sel.toggle(index, e.shiftKey)}
                             ariaLabel={`בחר ${c.code}`} />
                 </td>
-                <td className="num" style={{ fontWeight: 600 }}>{c.code}</td>
-                <td className="num">{valueLabel(c)}</td>
+                <td className="num" style={{ fontWeight: 600 }}>
+                  {c.code}
+                  {c.oncePerCustomer && (
+                    <span style={{
+                      marginInlineStart: 6, fontSize: 10, padding: '1px 6px', borderRadius: 999,
+                      background: 'var(--olive-soft)', color: 'var(--olive-2)', whiteSpace: 'nowrap',
+                    }}>1/לקוח</span>
+                  )}
+                </td>
+                <td>{c.summary}</td>
                 <td className="num" style={{ color: 'var(--ink-3)' }}>
                   {c.minSubtotalAgorot > 0 ? formatPrice(c.minSubtotalAgorot) : '—'}
                 </td>

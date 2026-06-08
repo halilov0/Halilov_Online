@@ -144,27 +144,37 @@ export type RefundRequest = {
   restoreStock?: boolean
 }
 
-export type CouponType = 'PERCENT' | 'FIXED'
-
+/** A coupon carries any mix of benefits (percent / fixed / free shipping);
+ *  at least one must be set. Nulls mean "benefit not granted". */
 export type Coupon = {
   id: number
   code: string
-  type: CouponType
-  value: number
+  percentOff: number | null
+  fixedOffAgorot: number | null
+  freeShipping: boolean
+  maxDiscountAgorot: number | null
   minSubtotalAgorot: number
   maxUses: number | null
+  oncePerCustomer: boolean
   usedCount: number
+  activeFrom: string | null
   expiresAt: string | null
   active: boolean
+  /** Server-rendered Hebrew summary, e.g. "20% הנחה + משלוח חינם". */
+  summary: string
   createdAt: string
 }
 
 export type CouponUpsert = {
   code: string
-  type: CouponType
-  value: number
+  percentOff: number | null
+  fixedOffAgorot: number | null
+  freeShipping: boolean
+  maxDiscountAgorot: number | null
   minSubtotalAgorot: number
   maxUses: number | null
+  oncePerCustomer: boolean
+  activeFrom: string | null
   expiresAt: string | null
   active: boolean
 }

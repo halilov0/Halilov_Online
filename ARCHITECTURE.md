@@ -80,7 +80,7 @@ package root (`com.halilov.online`). Each subpackage carries a
 | `catalog`       | Products, categories, sitemap, public + admin catalog APIs.                  |
 | `cart`          | Server-backed cart lines for signed-in users (`cart_lines` table).           |
 | `favorites`     | Server-backed wishlist for signed-in users (`favorites` table).              |
-| `coupon`        | Discount codes (PERCENT / FIXED), usage counters, validation.                |
+| `coupon`        | Composable discount codes (% + ₪ + free-shipping mix, cap, once-per-customer, scheduling), usage counters, validation. |
 | `order`         | Order lifecycle, addresses, delivery method/pricing, refunds, CSV export.    |
 | `payment`       | Payment orchestration + `payments` table. PayPal (Orders v2) capture + Green Invoice קבלה (type 400); `mock`/`disabled` fallbacks. Provider-neutral — see [PAYMENTS_BUILD.md](PAYMENTS_BUILD.md). |
 | `notification`  | Transactional email outbox + builders (order paid, reset, back-in-stock).    |
