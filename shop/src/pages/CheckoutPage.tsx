@@ -75,7 +75,11 @@ export function CheckoutPage() {
 
   // Loaded lookup sets for validation. Empty = not yet loaded (don't block submit on those).
   const [allCities, setAllCities] = useState<Set<string>>(new Set())
-  const [streetsForCity, setStreetsForCity] = useState<Set<string>>(new Set())
+  // Streets are NOT prefetched into a set: the browse endpoint caps at 2000, and big
+  // cities (Tel Aviv) overflow that — late-alef-bet streets (ש/ת) fall off and get
+  // falsely rejected. Validate each street against the server instead (exact-match
+  // query, same source the dropdown uses). Seq guards against stale async overwrites.
+  const streetCheckSeq = useRef(0)
 
   // Saved address book — picker at top of form, falls back to manual entry.
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([])
@@ -126,16 +130,20 @@ export function CheckoutPage() {
     fetchCities('').then(list => setAllCities(new Set(list))).catch(() => { /* tolerate */ })
   }, [])
 
-  // Refetch street list whenever city changes (and is a real selected city).
-  useEffect(() => {
-    const c = city.trim()
-    if (!c) { setStreetsForCity(new Set()); return }
-    let cancelled = false
-    fetchStreets(c, '').then(list => {
-      if (!cancelled) setStreetsForCity(new Set(list))
-    }).catch(() => { if (!cancelled) setStreetsForCity(new Set()) })
-    return () => { cancelled = true }
-  }, [city])
+  // Server-backed exact-match check for a typed street. Uses the same filtered
+  // endpoint as the dropdown, so it finds any real street regardless of list size.
+  // Tolerates API failure (returns true) — never block a paying customer on a
+  // places-lookup outage.
+  async function confirmStreetValid(value: string): Promise<boolean> {
+    const v = value.trim()
+    if (!v || !city.trim()) return false
+    try {
+      const list = await fetchStreets(city, v)
+      return list.includes(v)
+    } catch {
+      return true
+    }
+  }
 
   if (lines.length === 0 && !submitting) return null
 
@@ -191,9 +199,9 @@ export function CheckoutPage() {
         return null
       }
       case 'street': {
-        if (!v) return 'נדרש רחוב'
-        if (streetsForCity.size > 0 && !streetsForCity.has(v)) return 'בחרו רחוב מהרשימה'
-        return null
+        // Required only — existence is confirmed against the server (async) in
+        // markBlur/onSubmit, since the full street list can't be held client-side.
+        return v ? null : 'נדרש רחוב'
       }
       case 'houseNo':    return HOUSE_NO_RE.test(v) ? null : 'מספר בית לא תקין'
       case 'postalCode': {
@@ -206,7 +214,16 @@ export function CheckoutPage() {
 
   function markBlur(name: ErrorKey, value: string) {
     setTouched(t => ({ ...t, [name]: true }))
-    setErrors(e => ({ ...e, [name]: validate(name, value) ?? undefined }))
+    const syncErr = validate(name, value) ?? undefined
+    setErrors(e => ({ ...e, [name]: syncErr }))
+    // Street: required passes locally, so confirm it exists against the server.
+    if (name === 'street' && !syncErr && value.trim()) {
+      const seq = ++streetCheckSeq.current
+      void confirmStreetValid(value).then(ok => {
+        if (seq !== streetCheckSeq.current) return // a newer edit/check superseded this
+        setErrors(e => ({ ...e, street: ok ? undefined : 'בחרו רחוב מהרשימה' }))
+      })
+    }
   }
 
   function patchOnChange(name: ErrorKey, value: string) {
@@ -232,6 +249,10 @@ export function CheckoutPage() {
     setError(null)
 
     const validated = validateAll()
+    // Authoritative street existence check — async, against the server.
+    if (!validated.street && street.trim() && !(await confirmStreetValid(street))) {
+      validated.street = 'בחרו רחוב מהרשימה'
+    }
     const hasErrors = Object.values(validated).some(Boolean)
     if (hasErrors) {
       setErrors(validated)
@@ -473,7 +494,7 @@ export function CheckoutPage() {
                     label="רחוב"
                     required
                     value={street}
-                    onChange={v => { setStreet(v); patchOnChange('street', v) }}
+                    onChange={v => { streetCheckSeq.current++; setStreet(v); patchOnChange('street', v) }}
                     onBlur={() => markBlur('street', street)}
                     fetchSuggestions={q => fetchStreets(city, q)}
                     resetKey={city}
