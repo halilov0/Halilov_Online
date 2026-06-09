@@ -84,6 +84,7 @@ export function Footer() {
       <div className="cls-footer-bottom">
         <span>© {new Date().getFullYear()} חלילוב אונליין · עוסק פטור 325350643. כל הזכויות שמורות.</span>
         <div className="pays">
+          <span className="pay-chip">PayPal</span>
           <span className="pay-chip">VISA</span>
           <span className="pay-chip">MASTERCARD</span>
           <span className="pay-chip">AMEX</span>

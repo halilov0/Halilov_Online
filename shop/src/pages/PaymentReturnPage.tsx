@@ -34,22 +34,44 @@ export function PaymentReturnPage() {
     }
 
     const paypalOrderId = params.get('token') // PayPal's order id on return
+
+    // Don't trust the capture response to always arrive: PayPal also fires a
+    // webhook that marks the order PAID server-side, so a lost/slow capture
+    // response shouldn't strand the buyer on the spinner forever. After 15s,
+    // bounce to the order page (no ?paid flag — it renders the real status,
+    // which the webhook has likely already flipped to PAID).
+    const orderHref = `/orders/${orderNumber}${guestToken ? `?t=${encodeURIComponent(guestToken)}` : ''}`
+    let settled = false
+    const fallback = setTimeout(() => {
+      if (settled) return
+      settled = true
+      nav(orderHref, { replace: true })
+    }, 15000)
+
     ;(async () => {
       try {
         const res = await api<{ orderNumber: string; status: string }>(
           `/api/payments/paypal/${orderNumber}/capture`,
           { method: 'POST', body: JSON.stringify({ paypalOrderId }) },
         )
+        if (settled) return
+        settled = true
+        clearTimeout(fallback)
         if (res.status === 'PAID') {
           nav(`/orders/${orderNumber}?paid=1${suffix}`, { replace: true })
         } else {
           setError('התשלום לא הושלם. אפשר לנסות שוב מעמוד ההזמנה.')
         }
       } catch (e) {
+        if (settled) return
+        settled = true
+        clearTimeout(fallback)
         setError(e instanceof Error ? e.message : 'שגיאה באימות התשלום')
       }
     })()
-  }, [orderNumber, isCancel, nav, params, suffix])
+
+    return () => { settled = true; clearTimeout(fallback) }
+  }, [orderNumber, isCancel, nav, params, suffix, guestToken])
 
   return (
     <>
