@@ -1,6 +1,5 @@
 package com.halilov.online.audit;
 
-import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
@@ -11,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import com.halilov.online.common.ClientIp;
 import com.halilov.online.user.UserRepository;
 
 /**
@@ -116,15 +116,7 @@ public class AuditService {
             ServletRequestAttributes attrs =
                 (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
             if (attrs == null) return null;
-            HttpServletRequest req = attrs.getRequest();
-            String h = req.getHeader("CF-Connecting-IP");
-            if (h != null && !h.isBlank()) return h.trim();
-            h = req.getHeader("X-Forwarded-For");
-            if (h != null && !h.isBlank()) {
-                int comma = h.indexOf(',');
-                return (comma >= 0 ? h.substring(0, comma) : h).trim();
-            }
-            return req.getRemoteAddr();
+            return ClientIp.resolve(attrs.getRequest());
         } catch (Exception e) {
             return null;
         }

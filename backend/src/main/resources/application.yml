@@ -67,7 +67,8 @@ app:
     allowedOrigins: ${CORS_ALLOWED_ORIGINS:}
   jwt:
     secret: ${JWT_SECRET:dev-only-change-me-dev-only-change-me-32+chars-min}
-    expirationMinutes: 60
+    # 12h by default — a full admin work day before re-login. Overridable per env.
+    expirationMinutes: ${JWT_EXPIRATION_MINUTES:720}
   init:
     admin:
       email: ${INIT_ADMIN_EMAIL:admin@halilov.local}

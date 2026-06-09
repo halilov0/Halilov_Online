@@ -1,14 +1,23 @@
 package com.halilov.online.auth;
 
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+
+import com.halilov.online.auth.totp.TrustedDeviceService;
+import com.halilov.online.common.ClientIp;
+
+import java.time.Duration;
 
 /**
  * Public authentication surface under {@code /api/auth}.
@@ -43,13 +52,42 @@ public class AuthController {
      */
     @PostMapping("/login")
     public Object login(@Valid @RequestBody AuthDtos.LoginRequest req, HttpServletRequest http) {
-        AuthService.LoginOutcome outcome = authService.login(req, http.getRemoteAddr());
+        String deviceToken = readCookie(http, TrustedDeviceService.COOKIE);
+        AuthService.LoginOutcome outcome = authService.login(req, ClientIp.resolve(http), deviceToken);
         return outcome.challenge() != null ? outcome.challenge() : outcome.token();
     }
 
     @PostMapping("/login/totp")
-    public AuthDtos.TokenResponse loginTotp(@Valid @RequestBody AuthDtos.TotpLoginRequest req) {
-        return authService.completeTotpLogin(req.challenge(), req.code());
+    public AuthDtos.TokenResponse loginTotp(@Valid @RequestBody AuthDtos.TotpLoginRequest req,
+                                            HttpServletResponse resp) {
+        AuthService.TotpResult result = authService.completeTotpLogin(
+            req.challenge(), req.code(), Boolean.TRUE.equals(req.trustDevice()));
+        if (result.deviceCookieToken() != null) {
+            resp.addHeader(HttpHeaders.SET_COOKIE, buildDeviceCookie(result.deviceCookieToken()));
+        }
+        return result.token();
+    }
+
+    private static String readCookie(HttpServletRequest req, String name) {
+        Cookie[] cookies = req.getCookies();
+        if (cookies == null) return null;
+        for (Cookie c : cookies) {
+            if (name.equals(c.getName())) return c.getValue();
+        }
+        return null;
+    }
+
+    /** Build the trusted-device cookie: HttpOnly + Secure + SameSite=Strict,
+     *  scoped to the auth endpoints, living for {@link TrustedDeviceService#TTL_DAYS}. */
+    private static String buildDeviceCookie(String token) {
+        return ResponseCookie.from(TrustedDeviceService.COOKIE, token)
+            .httpOnly(true)
+            .secure(true)
+            .sameSite("Strict")
+            .path("/api/auth")
+            .maxAge(Duration.ofDays(TrustedDeviceService.TTL_DAYS))
+            .build()
+            .toString();
     }
 
     @GetMapping("/me")

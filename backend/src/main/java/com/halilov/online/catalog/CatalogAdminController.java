@@ -97,6 +97,16 @@ public class CatalogAdminController {
         return new BulkResult(deleted, req.ids().size() - deleted);
     }
 
+    /** Bulk show/hide products in the shop without deleting them. */
+    @PostMapping("/products/bulk-active")
+    public BulkResult bulkSetProductsActive(@Valid @RequestBody CatalogDtos.BulkActiveRequest req) {
+        int changed = catalog.setProductsActive(req.ids(), req.active());
+        String verb = req.active() ? "הופעלו" : "הוסתרו";
+        audit.record(AuditAction.PRODUCT_BULK_STATUS, "product", null,
+            changed + " מוצרים " + verb + " בבת אחת", BulkResult.idsMetadata(req.ids()));
+        return new BulkResult(changed, req.ids().size() - changed);
+    }
+
     @GetMapping(value = "/products.csv", produces = "text/csv; charset=UTF-8")
     public ResponseEntity<String> exportProductsCsv() {
         String csv = catalog.exportProductsCsv();

@@ -34,7 +34,7 @@ type AuthState = {
   // Holds the 2FA challenge token when the backend asks for a code.
   pendingChallenge: string | null
   login: (email: string, password: string) => Promise<LoginStepResult>
-  submitTotp: (code: string) => Promise<void>
+  submitTotp: (code: string, trustDevice: boolean) => Promise<void>
   cancelTotp: () => void
   logout: () => void
   fetchMe: () => Promise<void>
@@ -83,14 +83,17 @@ export const useAuth = create<AuthState>((set, get) => ({
     }
   },
 
-  async submitTotp(code) {
+  async submitTotp(code, trustDevice) {
     const challenge = get().pendingChallenge
     if (!challenge) throw new Error('אין אתגר פעיל. נסו להתחבר שוב.')
     set({ loading: true, error: null })
     try {
+      // trustDevice → backend sets the hm_device cookie so this browser skips
+      // 2FA for 30 days. The cookie is same-origin + HttpOnly; the browser
+      // stores and re-sends it automatically on the next login.
       const res = await api<AuthResponse>('/api/auth/login/totp', {
         method: 'POST',
-        body: JSON.stringify({ challenge, code: code.trim() }),
+        body: JSON.stringify({ challenge, code: code.trim(), trustDevice }),
       })
       if (res.role !== 'ADMIN') {
         throw new Error('המשתמש אינו מנהל')

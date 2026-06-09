@@ -9,6 +9,7 @@ import com.halilov.online.audit.AuditAction;
 import com.halilov.online.audit.AuditService;
 import com.halilov.online.auth.totp.TotpChallengeStore;
 import com.halilov.online.auth.totp.TotpService;
+import com.halilov.online.auth.totp.TrustedDeviceService;
 import com.halilov.online.auth.totp.TrustedIpService;
 import com.halilov.online.security.JwtService;
 import com.halilov.online.user.Role;
@@ -55,6 +56,7 @@ public class AuthService {
     private final TotpService totp;
     private final TotpChallengeStore challenges;
     private final TrustedIpService trustedIps;
+    private final TrustedDeviceService trustedDevice;
 
     public AuthService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
@@ -62,7 +64,8 @@ public class AuthService {
                        AuditService audit,
                        TotpService totp,
                        TotpChallengeStore challenges,
-                       TrustedIpService trustedIps) {
+                       TrustedIpService trustedIps,
+                       TrustedDeviceService trustedDevice) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
@@ -70,6 +73,7 @@ public class AuthService {
         this.totp = totp;
         this.challenges = challenges;
         this.trustedIps = trustedIps;
+        this.trustedDevice = trustedDevice;
     }
 
     @Transactional
@@ -108,7 +112,7 @@ public class AuthService {
     }
 
     @Transactional
-    public LoginOutcome login(AuthDtos.LoginRequest req, String clientIp) {
+    public LoginOutcome login(AuthDtos.LoginRequest req, String clientIp, String deviceToken) {
         String email = req.email().toLowerCase().trim();
         User user = userRepository.findByEmail(email).orElse(null);
 
@@ -166,9 +170,12 @@ public class AuthService {
             user.setLockedUntil(null);
         }
 
-        // 2FA gate: only ADMIN with TOTP enrolled, only when the login is
-        // from an IP not on the trusted list. CUSTOMER never sees 2FA.
-        if (user.getRole() == Role.ADMIN && user.isTotpEnabled() && !trustedIps.isTrusted(clientIp)) {
+        // 2FA gate: only ADMIN with TOTP enrolled. Skipped when the login is
+        // from a trusted IP, or carries a valid "remember this device" token.
+        // CUSTOMER never sees 2FA.
+        if (user.getRole() == Role.ADMIN && user.isTotpEnabled()
+                && !trustedIps.isTrusted(clientIp)
+                && !trustedDevice.isValidFor(user, deviceToken)) {
             String challenge = challenges.issue(user.getId());
             audit.recordAs(user.getId(), user.getEmail(), user.getRole().name(),
                 AuditAction.USER_LOGIN_2FA_CHALLENGE, "user", user.getId(),
@@ -182,10 +189,16 @@ public class AuthService {
         return LoginOutcome.ofToken(toToken(user));
     }
 
+    /** Result of step 2: the session token plus, when the admin opted to
+     *  remember the device, a 30-day trusted-device cookie token (else null). */
+    public record TotpResult(AuthDtos.TokenResponse token, String deviceCookieToken) {}
+
     /** Step 2 of the admin 2FA flow. Consumes the challenge, validates a
-     *  TOTP code or one-shot recovery code, and issues the JWT. */
+     *  TOTP code or one-shot recovery code, and issues the JWT. When
+     *  {@code trustDevice} is set, also mints a trusted-device token so this
+     *  browser can skip the 2FA challenge for the next {@code TTL_DAYS} days. */
     @Transactional
-    public AuthDtos.TokenResponse completeTotpLogin(String challenge, String code) {
+    public TotpResult completeTotpLogin(String challenge, String code, boolean trustDevice) {
         Long userId = challenges.consume(challenge);
         if (userId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "challenge expired");
@@ -206,7 +219,8 @@ public class AuthService {
         audit.recordAs(user.getId(), user.getEmail(), user.getRole().name(),
             AuditAction.USER_LOGIN, "user", user.getId(),
             "התחברות (אומת 2FA): " + user.getEmail(), null);
-        return toToken(user);
+        String deviceToken = trustDevice ? trustedDevice.issue(user) : null;
+        return new TotpResult(toToken(user), deviceToken);
     }
 
     public AuthDtos.MeResponse me(String email) {

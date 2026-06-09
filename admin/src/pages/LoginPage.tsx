@@ -7,6 +7,7 @@ export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [totpCode, setTotpCode] = useState('')
+  const [trustDevice, setTrustDevice] = useState(true)
   const { login, submitTotp, cancelTotp, pendingChallenge, loading, error } = useAuth()
   const nav = useNavigate()
   const location = useLocation()
@@ -25,7 +26,7 @@ export function LoginPage() {
   async function onTotpSubmit(e: React.FormEvent) {
     e.preventDefault()
     try {
-      await submitTotp(totpCode)
+      await submitTotp(totpCode, trustDevice)
       nav(from, { replace: true })
     } catch { /* error in store */ }
   }
@@ -72,9 +73,21 @@ export function LoginPage() {
               type="text"
               required
               mono
+              // one-time-code → Chrome treats this as an OTP, not a password,
+              // so it stops offering to "save password" after submit.
+              autoComplete="one-time-code"
+              inputMode="numeric"
               value={totpCode}
               onChange={e => setTotpCode(e.target.value)}
             />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, color: 'var(--ink-2)', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={trustDevice}
+                onChange={e => setTrustDevice(e.target.checked)}
+              />
+              <span>זכרו מכשיר זה ל-30 יום (דלגו על קוד בכניסה הבאה)</span>
+            </label>
             {error && <div className="hm-error">{error}</div>}
             <button type="submit" className="hm-btn hm-btn-primary" style={{ justifyContent: 'center', padding: '14px 26px', fontSize: 15 }} disabled={loading || !totpCode}>
               {loading ? 'מאמת…' : 'אישור'}

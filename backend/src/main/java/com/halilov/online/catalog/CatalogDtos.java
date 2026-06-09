@@ -25,6 +25,13 @@ public class CatalogDtos {
         @Min(0) int sortOrder
     ) {}
 
+    /** Bulk activate/hide products: {@code active=true} shows them in the
+     *  shop, {@code false} hides them. Capped to match {@code BulkIdsRequest}. */
+    public record BulkActiveRequest(
+        @NotEmpty @Size(max = 2000) List<Long> ids,
+        boolean active
+    ) {}
+
     public record ProductView(
         Long id, String sku, String slug, String nameHe, String descriptionHe,
         Long categoryId, int priceAgorot, int stockQty,

@@ -36,6 +36,7 @@ public final class AuditAction {
     public static final String PRODUCT_UPDATED     = "PRODUCT_UPDATED";
     public static final String PRODUCT_DELETED     = "PRODUCT_DELETED";
     public static final String PRODUCT_BULK_DELETED = "PRODUCT_BULK_DELETED";
+    public static final String PRODUCT_BULK_STATUS = "PRODUCT_BULK_STATUS";
     public static final String CATEGORY_CREATED    = "CATEGORY_CREATED";
     public static final String CATEGORY_UPDATED    = "CATEGORY_UPDATED";
     public static final String CATEGORY_DELETED    = "CATEGORY_DELETED";

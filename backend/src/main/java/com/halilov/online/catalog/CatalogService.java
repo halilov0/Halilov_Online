@@ -159,6 +159,26 @@ public class CatalogService {
         return found.size();
     }
 
+    /**
+     * Flip the {@code active} flag on every product in {@code ids}. Ids that
+     * don't resolve are skipped; the returned count is how many rows actually
+     * changed (already-in-that-state rows are not re-counted), so the audit
+     * reflects real effect. Mirrors the single-product active toggle that the
+     * edit form performs, with no cache to evict.
+     */
+    @Transactional
+    public int setProductsActive(List<Long> ids, boolean active) {
+        List<Product> found = products.findAllById(ids);
+        int changed = 0;
+        for (Product p : found) {
+            if (p.isActive() != active) {
+                p.setActive(active);
+                changed++;
+            }
+        }
+        return changed;
+    }
+
     /** Bulk sibling of {@link #deleteCategory}. Products keep working;
      *  they just lose the category link, exactly like the single delete. */
     @Transactional

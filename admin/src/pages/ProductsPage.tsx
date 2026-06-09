@@ -187,6 +187,22 @@ export function ProductsPage() {
     }
   }
 
+  // Show (active=true) / hide (active=false) a set of products without
+  // deleting. Used by the bulk bar and the single-row status toggle.
+  async function setActive(ids: number[], active: boolean) {
+    if (ids.length === 0) return
+    setError(null)
+    try {
+      await api<BulkResult>('/api/admin/catalog/products/bulk-active', {
+        method: 'POST', body: JSON.stringify({ ids, active }),
+      })
+      push(active ? 'המוצרים הופעלו' : 'המוצרים הוסתרו')
+      sel.clear(); load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'שגיאה')
+    }
+  }
+
   const isEditing = creating || editing
   const lowStockCount = products.filter(p => p.stockQty < 10 && p.active).length
 
@@ -479,9 +495,15 @@ export function ProductsPage() {
                   {p.stockQty}{lowStock && !outOfStock && ' ⚠'}
                 </td>
                 <td>
-                  <span className={`hm-status ${p.active ? 'hm-status-paid' : 'hm-status-cancelled'}`} style={{ textTransform: 'none' }}>
+                  <button
+                    type="button"
+                    className={`hm-status ${p.active ? 'hm-status-paid' : 'hm-status-cancelled'}`}
+                    style={{ textTransform: 'none', cursor: 'pointer', border: 'none', font: 'inherit' }}
+                    title={p.active ? 'לחצו כדי להסתיר מהחנות' : 'לחצו כדי להפעיל בחנות'}
+                    onClick={() => setActive([p.id], !p.active)}
+                  >
                     {p.active ? 'פעיל' : 'מוסתר'}
-                  </span>
+                  </button>
                 </td>
                 <td style={{ display: 'flex', gap: 6 }}>
                   <button className="hm-btn hm-btn-quiet" style={{ padding: '5px 12px', fontSize: 12 }} onClick={() => startEdit(p)}>עריכה</button>
@@ -501,6 +523,8 @@ export function ProductsPage() {
       </table>
 
       <BulkBar count={sel.count} onClear={sel.clear}>
+        <button className="hm-btn hm-btn-quiet" onClick={() => setActive(sel.selectedList, true)}>הפעלה</button>
+        <button className="hm-btn hm-btn-quiet" onClick={() => setActive(sel.selectedList, false)}>הסתרה</button>
         <button className="hm-btn hm-btn-danger" onClick={bulkDelete}>מחיקת נבחרים</button>
       </BulkBar>
     </>

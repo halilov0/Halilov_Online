@@ -36,6 +36,8 @@ public class AuthDtos {
 
     public record TotpLoginRequest(
         @NotBlank String challenge,
-        @NotBlank String code
+        @NotBlank String code,
+        /** When true, issue a 30-day cookie so this browser skips 2FA next time. */
+        Boolean trustDevice
     ) {}
 }
