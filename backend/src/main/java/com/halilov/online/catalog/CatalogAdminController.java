@@ -88,6 +88,13 @@ public class CatalogAdminController {
         audit.record(AuditAction.PRODUCT_DELETED, "product", id, "מוצר נמחק (#" + id + ")");
     }
 
+    /** Full product list for the admin table — includes hidden (inactive)
+     *  products, unlike the public {@code /api/products} read. */
+    @GetMapping("/products")
+    public java.util.List<CatalogDtos.ProductView> listProducts() {
+        return catalog.listAllForAdmin();
+    }
+
     /** Bulk-delete products. CSV export exists as a pre-delete backup. */
     @PostMapping("/products/bulk-delete")
     public BulkResult bulkDeleteProducts(@Valid @RequestBody BulkIdsRequest req) {

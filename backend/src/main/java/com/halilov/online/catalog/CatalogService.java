@@ -160,6 +160,18 @@ public class CatalogService {
     }
 
     /**
+     * Every product, active or hidden, for the admin catalog table. The public
+     * {@code /api/products} read filters to active-only, which would make a
+     * hidden product vanish from the admin's own list — so admin reads this.
+     * Newest first, matching the public list's default ordering.
+     */
+    @Transactional(readOnly = true)
+    public List<CatalogDtos.ProductView> listAllForAdmin() {
+        return products.findAll(Sort.by("createdAt").descending())
+            .stream().map(CatalogDtos.ProductView::from).toList();
+    }
+
+    /**
      * Flip the {@code active} flag on every product in {@code ids}. Ids that
      * don't resolve are skipped; the returned count is how many rows actually
      * changed (already-in-that-state rows are not re-counted), so the audit

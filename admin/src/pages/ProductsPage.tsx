@@ -58,10 +58,12 @@ export function ProductsPage() {
   function load() {
     setError(null)
     Promise.all([
-      api<{ content: Product[] }>('/api/products?size=200'),
+      // Admin endpoint — returns hidden (inactive) products too, so a
+      // deactivated item stays visible here to be toggled back on.
+      api<Product[]>('/api/admin/catalog/products'),
       api<Category[]>('/api/categories'),
     ])
-      .then(([p, c]) => { setProducts(p.content); setCategories(c) })
+      .then(([p, c]) => { setProducts(p); setCategories(c) })
       .catch(e => setError(e.message))
   }
   useEffect(load, [])
@@ -368,7 +370,8 @@ export function ProductsPage() {
         <div>
           <h1>מוצרים</h1>
           <div className="sub">
-            {products.filter(p => p.active).length} פעילים
+            {products.length} מוצרים · {products.filter(p => p.active).length} פעילים
+            {products.some(p => !p.active) && ` · ${products.filter(p => !p.active).length} מוסתרים`}
             {lowStockCount > 0 && ` · ${lowStockCount} במלאי נמוך`}
           </div>
         </div>
