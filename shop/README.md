@@ -38,7 +38,8 @@ dev; in prod nginx does the same job at the edge.
 ```
 src/
   api.ts                  fetch wrapper, types, formatPrice helper, guest-token plumbing
-  App.tsx                 router, top-level useEffect that hydrates user on token
+  App.tsx                 router, hydrate-user-on-token effect, per-route SEO effect
+  seo.ts                  per-route canonical + robots (noindex) for the SPA shell
   main.tsx                React root mount
   auth/authStore.ts       Zustand: token + user, login/register/logout/fetchMe
   cart/cartStore.ts       Zustand: cart lines, debounced server sync, cross-tab + cross-device

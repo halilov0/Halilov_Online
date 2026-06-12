@@ -31,21 +31,6 @@ function upsertMeta(key: string, content: string, attr: 'name' | 'property' = 'n
   return () => el.remove()
 }
 
-function upsertLink(rel: string, href: string): () => void {
-  const sel = `link[rel="${CSS.escape(rel)}"]`
-  const existing = document.head.querySelector<HTMLLinkElement>(sel)
-  if (existing) {
-    const prev = existing.getAttribute('href') ?? ''
-    existing.setAttribute('href', href)
-    return () => existing.setAttribute('href', prev)
-  }
-  const el = document.createElement('link')
-  el.setAttribute('rel', rel)
-  el.setAttribute('href', href)
-  document.head.appendChild(el)
-  return () => el.remove()
-}
-
 function NotifyWhenInStock({
   productId, isFav, onToggleFav,
 }: { productId: number; isFav: boolean; onToggleFav: () => void }) {
@@ -150,7 +135,8 @@ export function ProductPage() {
     api<Category[]>('/api/categories').then(setCategories).catch(() => {})
   }, [])
 
-  // Per-page SEO: <title>, meta description, canonical, and Product JSON-LD.
+  // Per-page SEO: <title>, meta description, OG tags, and Product JSON-LD.
+  // The canonical is owned globally by App's per-route SEO effect (seo.ts).
   // SPA, so we mutate <head> on mount and restore on unmount.
   useEffect(() => {
     if (!product) return
@@ -163,7 +149,6 @@ export function ProductPage() {
       upsertMeta('og:title', `${product.nameHe} · חלילוב אונליין`, 'property'),
       upsertMeta('og:description', desc, 'property'),
       upsertMeta('og:type', 'product', 'property'),
-      upsertLink('canonical', `https://halilov.co.il/p/${product.slug}`),
     ]
     if (product.imageUrl) {
       cleanups.push(upsertMeta('og:image', product.imageUrl, 'property'))

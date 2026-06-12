@@ -24,6 +24,7 @@ import { useAuth } from './auth/authStore'
 import { useCart } from './cart/cartStore'
 import { useDeliveryConfig } from './delivery/deliveryConfig'
 import { getToken } from './api'
+import { isIndexable, canonicalFor, setCanonical, setRobots } from './seo'
 
 function App() {
   const fetchMe = useAuth(s => s.fetchMe)
@@ -45,6 +46,20 @@ function App() {
     // every surface reads from one server-backed source instead of literals.
     void useDeliveryConfig.getState().load()
   }, [fetchMe])
+
+  // Per-route SEO. index.html ships no canonical, so this is the single owner:
+  // rewrite the canonical to the current route, and keep non-public routes
+  // (cart, checkout, account, auth, payment, invoice…) out of the index with
+  // noindex. Keep the indexable set in sync with SitemapController.java.
+  useEffect(() => {
+    if (isIndexable(loc.pathname)) {
+      setRobots(null)
+      setCanonical(canonicalFor(loc.pathname))
+    } else {
+      setCanonical(null)
+      setRobots('noindex, follow')
+    }
+  }, [loc.pathname])
 
   // Auth pages render their own split layout (no global header)
   // Mock payment page mimics an external gateway, so we hide our chrome too.
